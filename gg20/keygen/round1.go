@@ -1,4 +1,4 @@
-package gg20
+package keygen
 
 import (
 	"github.com/bloxapp/ssv-spec/dkg/types"

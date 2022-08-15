@@ -4,8 +4,8 @@ import (
 	"encoding/hex"
 	"github.com/bloxapp/ssv-spec/dkg/testutils"
 	dkgtypes "github.com/bloxapp/ssv-spec/dkg/types"
-	"github.com/bloxapp/ssv-spec/gg20"
 	"github.com/bloxapp/ssv-spec/gg20/algorithms/vss"
+	"github.com/bloxapp/ssv-spec/gg20/keygen"
 	types2 "github.com/bloxapp/ssv-spec/gg20/types"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
@@ -166,7 +166,7 @@ func h2b(str string) []byte {
 var baseInstance = func(dataset DkgPartyDataSet) dkgtypes.Protocol {
 	partyData := dataset.PartyData[1]
 	threshold := uint64(len(partyData.Coefficients) - 1)
-	state := gg20.EmptyKeygen(threshold, uint64(len(dataset.PartyData)))
+	state := keygen.EmptyKeygen(threshold, uint64(len(dataset.PartyData)))
 	committee := make([]uint64, len(dataset.PartyData))
 	count := 0
 	for id, _ := range dataset.PartyData {
@@ -189,7 +189,7 @@ var baseInstance = func(dataset DkgPartyDataSet) dkgtypes.Protocol {
 		count++
 	}
 
-	return &gg20.KGProtocol{
+	return &keygen.KGProtocol{
 		Identifier: dkgtypes.RequestID{},
 		Operator:   1,
 		Init: dkgtypes.Init{

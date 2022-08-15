@@ -4,7 +4,7 @@ import "C"
 import (
 	"encoding/hex"
 	"github.com/bloxapp/ssv-spec/dkg/types"
-	"github.com/bloxapp/ssv-spec/gg20"
+	"github.com/bloxapp/ssv-spec/gg20/keygen"
 	"github.com/herumi/bls-eth-go-binary/bls"
 	log "github.com/sirupsen/logrus"
 	"os"
@@ -30,7 +30,7 @@ func main() {
 	var (
 		ins       []chan M
 		outs      []chan M
-		kMachines []*gg20.Runner
+		kMachines []*keygen.Runner
 	)
 	defer func() {
 		for _, ch := range ins {
@@ -52,7 +52,7 @@ func main() {
 	for i := 1; i < n+1; i++ {
 		in := make(chan M, n)
 		out := make(chan M, n)
-		keygen, _ := gg20.NewRunner(id, uint64(i), uint64(t), committee, in, out)
+		keygen, _ := keygen.NewRunner(id, uint64(i), uint64(t), committee, in, out)
 		ins = append(ins, in)
 		outs = append(outs, out)
 		kMachines = append(kMachines, keygen)

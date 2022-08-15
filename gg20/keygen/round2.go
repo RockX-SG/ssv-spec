@@ -1,4 +1,4 @@
-package gg20
+package keygen
 
 import (
 	"encoding/binary"

@@ -1,4 +1,4 @@
-package gg20
+package keygen
 
 import "C"
 import (
@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/bloxapp/ssv-spec/dkg/types"
+	"github.com/bloxapp/ssv-spec/gg20"
 	"github.com/bloxapp/ssv-spec/gg20/algorithms/vss"
 	types2 "github.com/bloxapp/ssv-spec/gg20/types"
 	"github.com/herumi/bls-eth-go-binary/bls"
@@ -87,7 +88,7 @@ func NewKeygen(sessionId []byte, i, t uint64, committee []uint64) (*Keygen, erro
 	kg.SessionID = sessionId
 	kg.PartyI = i
 	kg.Coefficients = vss.CreatePolynomial(int(t + 1))
-	copy(kg.BlindFactor[:], MustGetRandomInt(SECURITY).Bytes())
+	copy(kg.BlindFactor[:], gg20.MustGetRandomInt(SECURITY).Bytes())
 	kg.DlogR.SetByCSPRNG()
 	return &kg, nil
 }
@@ -220,7 +221,7 @@ func (k *Keygen) GetCommitment() []byte {
 
 	var data []byte
 	decomm := k.GetDecommitment()
-	data = append(data, Uint64ToBytes(k.PartyI)...)
+	data = append(data, gg20.Uint64ToBytes(k.PartyI)...)
 	data = append(data, k.BlindFactor[:]...)
 	for _, bytes := range decomm {
 		data = append(data, bytes...)
@@ -235,7 +236,7 @@ func (k *Keygen) VerifyCommitment(r1 types2.Round1Msg, r2 types2.Round2Msg, part
 		return false
 	}
 	var data []byte
-	data = append(data, Uint64ToBytes(partyI)...)
+	data = append(data, gg20.Uint64ToBytes(partyI)...)
 	data = append(data, r2.BlindFactor...)
 	for _, bytes := range r2.Decommitment {
 		data = append(data, bytes...)
