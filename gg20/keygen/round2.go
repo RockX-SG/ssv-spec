@@ -41,7 +41,7 @@ func (k *Keygen) r2Proceed() error {
 	for i, share := range allShares {
 		receiver := k.Committee[i]
 		if i+1 != int(k.PartyI) {
-			msg := &types2.ParsedMessage{
+			msg := &types2.ParsedKGMessage{
 				Header: &types.MessageHeader{
 					SessionId: k.SessionID,
 					MsgType:   k.HandleMessageType,
@@ -49,7 +49,7 @@ func (k *Keygen) r2Proceed() error {
 					Receiver:  receiver,
 				},
 				Body: &types2.KeygenMsgBody{
-					Round3: &types2.Round3Msg{
+					Round3: &types2.KGRound3Msg{
 						Share: share.Share.Serialize(),
 					},
 				},

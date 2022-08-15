@@ -39,7 +39,7 @@ func (r *Runner) ProcessLoop() {
 		select {
 		case msg, ok := <-r.incoming:
 			if ok {
-				parsed := &types2.ParsedMessage{}
+				parsed := &types2.ParsedKGMessage{}
 				if err := parsed.FromBase(&msg); err == nil {
 					r.Keygen.PushMessage(parsed)
 				} else {

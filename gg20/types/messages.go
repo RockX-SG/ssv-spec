@@ -6,7 +6,7 @@ import (
 	"github.com/golang/protobuf/proto"
 )
 
-func (x *ParsedMessage) GetRoot() ([]byte, error) {
+func (x *ParsedKGMessage) GetRoot() ([]byte, error) {
 	baseMsg, err := x.ToBase()
 	if err != nil {
 		return nil, err
@@ -14,12 +14,12 @@ func (x *ParsedMessage) GetRoot() ([]byte, error) {
 	return baseMsg.GetRoot()
 }
 
-func (x *ParsedMessage) SetSignature(bytes []byte) error {
+func (x *ParsedKGMessage) SetSignature(bytes []byte) error {
 	x.Signature = bytes
 	return nil
 }
 
-func (x *ParsedMessage) FromBase(base *types.Message) error {
+func (x *ParsedKGMessage) FromBase(base *types.Message) error {
 	raw, err := proto.Marshal(base)
 	if err != nil {
 		return err
@@ -27,7 +27,7 @@ func (x *ParsedMessage) FromBase(base *types.Message) error {
 	return proto.Unmarshal(raw, x)
 }
 
-func (x *ParsedMessage) ToBase() (*types.Message, error) {
+func (x *ParsedKGMessage) ToBase() (*types.Message, error) {
 	raw, err := proto.Marshal(x)
 	if err != nil {
 		return nil, err
@@ -40,7 +40,7 @@ func (x *ParsedMessage) ToBase() (*types.Message, error) {
 	return base, nil
 }
 
-func (x *ParsedMessage) IsValid() bool {
+func (x *ParsedKGMessage) IsValid() bool {
 	cnt := 0
 	if x.Body.Round1 != nil {
 		cnt += 1
@@ -57,7 +57,7 @@ func (x *ParsedMessage) IsValid() bool {
 	return cnt == 1
 }
 
-func (x *ParsedMessage) GetRoundNumber() (int, error) {
+func (x *ParsedKGMessage) GetRoundNumber() (int, error) {
 	if x.Body.Round1 != nil {
 		return 1, nil
 	}
@@ -73,4 +73,4 @@ func (x *ParsedMessage) GetRoundNumber() (int, error) {
 	return 0, errors.New("invalid round")
 }
 
-type ParsedMessages = []*ParsedMessage
+type ParsedMessages = []*ParsedKGMessage

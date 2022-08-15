@@ -9,7 +9,7 @@ func (k *Keygen) r1Proceed() error {
 	if k.Round != 1 {
 		return ErrInvalidRound
 	}
-	msg := &types2.ParsedMessage{
+	msg := &types2.ParsedKGMessage{
 		Header: &types.MessageHeader{
 			SessionId: k.SessionID,
 			MsgType:   k.HandleMessageType,
@@ -17,7 +17,7 @@ func (k *Keygen) r1Proceed() error {
 			Receiver:  0,
 		},
 		Body: &types2.KeygenMsgBody{
-			Round2: &types2.Round2Msg{
+			Round2: &types2.KGRound2Msg{
 				Decommitment: k.GetDecommitment(),
 				BlindFactor:  k.BlindFactor[:],
 			},

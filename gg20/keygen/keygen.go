@@ -42,10 +42,10 @@ type Keygen struct {
 	PartyI            uint64
 	PartyCount        uint64
 	skI               *bls.SecretKey
-	Round1Msgs        map[uint64]*types2.ParsedMessage
-	Round2Msgs        map[uint64]*types2.ParsedMessage
-	Round3Msgs        map[uint64]*types2.ParsedMessage
-	Round4Msgs        map[uint64]*types2.ParsedMessage
+	Round1Msgs        map[uint64]*types2.ParsedKGMessage
+	Round2Msgs        map[uint64]*types2.ParsedKGMessage
+	Round3Msgs        map[uint64]*types2.ParsedKGMessage
+	Round4Msgs        map[uint64]*types2.ParsedKGMessage
 	Outgoing          types2.ParsedMessages
 	Output            *types.LocalKeyShare
 	HandleMessageType int32
@@ -65,10 +65,10 @@ func EmptyKeygen(t, n uint64) Keygen {
 		PartyI:            0,
 		PartyCount:        n,
 		skI:               nil,
-		Round1Msgs:        make(map[uint64]*types2.ParsedMessage, n),
-		Round2Msgs:        make(map[uint64]*types2.ParsedMessage, n),
-		Round3Msgs:        make(map[uint64]*types2.ParsedMessage, n),
-		Round4Msgs:        make(map[uint64]*types2.ParsedMessage, n),
+		Round1Msgs:        make(map[uint64]*types2.ParsedKGMessage, n),
+		Round2Msgs:        make(map[uint64]*types2.ParsedKGMessage, n),
+		Round3Msgs:        make(map[uint64]*types2.ParsedKGMessage, n),
+		Round4Msgs:        make(map[uint64]*types2.ParsedKGMessage, n),
 		Outgoing:          nil,
 		Output:            nil,
 		HandleMessageType: int32(types.ProtocolMsgType),
@@ -158,7 +158,7 @@ func (k *Keygen) ValidSender(sender uint64) bool {
 	return false
 }
 
-func (k *Keygen) PushMessage(msg *types2.ParsedMessage) error {
+func (k *Keygen) PushMessage(msg *types2.ParsedKGMessage) error {
 	if msg == nil || !msg.IsValid() {
 		return errors.New("invalid message")
 	}
@@ -203,7 +203,7 @@ func (k *Keygen) GetOutgoing() (types2.ParsedMessages, error) {
 	}
 }
 
-func (k *Keygen) pushOutgoing(msg *types2.ParsedMessage) {
+func (k *Keygen) pushOutgoing(msg *types2.ParsedKGMessage) {
 	k.outMutex.Lock()
 	defer k.outMutex.Unlock()
 	k.Outgoing = append(k.Outgoing, msg)
@@ -231,7 +231,7 @@ func (k *Keygen) GetCommitment() []byte {
 	return hash.Sum(nil)
 }
 
-func (k *Keygen) VerifyCommitment(r1 types2.Round1Msg, r2 types2.Round2Msg, partyI uint64) bool {
+func (k *Keygen) VerifyCommitment(r1 types2.KGRound1Msg, r2 types2.KGRound2Msg, partyI uint64) bool {
 	if len(k.Coefficients) != len(r2.Decommitment) {
 		return false
 	}

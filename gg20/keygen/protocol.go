@@ -64,7 +64,7 @@ func (k *KGProtocol) ProcessMsg(msg *dkgtypes.Message) ([]dkgtypes.Message, erro
 	if bytes.Compare(msg.Header.SessionId, k.State.SessionID) != 0 {
 		return nil, errors.New("invalid Identifier")
 	}
-	pMsg := &types2.ParsedMessage{}
+	pMsg := &types2.ParsedKGMessage{}
 	if err := pMsg.FromBase(msg); err != nil {
 		return nil, err
 	}

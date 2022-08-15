@@ -70,14 +70,14 @@ func (s DkgPartyDataSet) MakeLocalKeyShare(index uint64) *dkgtypes.LocalKeyShare
 	}
 }
 
-func (s DkgPartyDataSet) R1(operatorId types.OperatorID) *types2.ParsedMessage {
-	return &types2.ParsedMessage{
+func (s DkgPartyDataSet) R1(operatorId types.OperatorID) *types2.ParsedKGMessage {
+	return &types2.ParsedKGMessage{
 		Header: &dkgtypes.MessageHeader{
 			MsgType: int32(dkgtypes.ProtocolMsgType),
 			Sender:  uint64(operatorId),
 		},
 		Body: &types2.KeygenMsgBody{
-			Round1: &types2.Round1Msg{
+			Round1: &types2.KGRound1Msg{
 				Commitment: s.PartyData[operatorId].Commitment,
 			},
 		},
@@ -85,14 +85,14 @@ func (s DkgPartyDataSet) R1(operatorId types.OperatorID) *types2.ParsedMessage {
 	}
 }
 
-func (s DkgPartyDataSet) R2(operatorId types.OperatorID) *types2.ParsedMessage {
-	return &types2.ParsedMessage{
+func (s DkgPartyDataSet) R2(operatorId types.OperatorID) *types2.ParsedKGMessage {
+	return &types2.ParsedKGMessage{
 		Header: &dkgtypes.MessageHeader{
 			MsgType: int32(dkgtypes.ProtocolMsgType),
 			Sender:  uint64(operatorId),
 		},
 		Body: &types2.KeygenMsgBody{
-			Round2: &types2.Round2Msg{
+			Round2: &types2.KGRound2Msg{
 				Decommitment: s.PartyData[operatorId].DeCommitment,
 				BlindFactor:  s.PartyData[operatorId].BlindFactor,
 			},
@@ -101,15 +101,15 @@ func (s DkgPartyDataSet) R2(operatorId types.OperatorID) *types2.ParsedMessage {
 	}
 }
 
-func (s DkgPartyDataSet) R3(operatorId types.OperatorID, receiver types.OperatorID) *types2.ParsedMessage {
-	return &types2.ParsedMessage{
+func (s DkgPartyDataSet) R3(operatorId types.OperatorID, receiver types.OperatorID) *types2.ParsedKGMessage {
+	return &types2.ParsedKGMessage{
 		Header: &dkgtypes.MessageHeader{
 			MsgType:  int32(dkgtypes.ProtocolMsgType),
 			Sender:   uint64(operatorId),
 			Receiver: uint64(receiver),
 		},
 		Body: &types2.KeygenMsgBody{
-			Round3: &types2.Round3Msg{
+			Round3: &types2.KGRound3Msg{
 				Share: s.PartyData[operatorId].Shares[receiver],
 			},
 		},
@@ -117,14 +117,14 @@ func (s DkgPartyDataSet) R3(operatorId types.OperatorID, receiver types.Operator
 	}
 }
 
-func (s DkgPartyDataSet) R4(operatorId types.OperatorID) *types2.ParsedMessage {
-	return &types2.ParsedMessage{
+func (s DkgPartyDataSet) R4(operatorId types.OperatorID) *types2.ParsedKGMessage {
+	return &types2.ParsedKGMessage{
 		Header: &dkgtypes.MessageHeader{
 			MsgType: int32(dkgtypes.ProtocolMsgType),
 			Sender:  uint64(operatorId),
 		},
 		Body: &types2.KeygenMsgBody{
-			Round4: &types2.Round4Msg{
+			Round4: &types2.KGRound4Msg{
 				Commitment:        s.PartyData[operatorId].ProofCommitment,
 				PubKey:            s.SharePublicKeys[operatorId],
 				ChallengeResponse: s.PartyData[operatorId].ProofResponse,
@@ -150,10 +150,10 @@ type KeygenPartyData struct {
 	Coefficients  [][]byte
 	BlindFactor   []byte
 	DlogR         []byte
-	R1Message     types2.ParsedMessage
-	R2Message     types2.ParsedMessage
-	R3Messages    []types2.ParsedMessage
-	R4Message     types2.ParsedMessage
+	R1Message     types2.ParsedKGMessage
+	R2Message     types2.ParsedKGMessage
+	R3Messages    []types2.ParsedKGMessage
+	R4Message     types2.ParsedKGMessage
 	OwnShare      []byte
 	LocalKeyShare dkgtypes.LocalKeyShare
 }

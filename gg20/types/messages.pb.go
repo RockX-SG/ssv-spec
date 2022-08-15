@@ -21,7 +21,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type Round1Msg struct {
+type KGRound1Msg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -29,8 +29,8 @@ type Round1Msg struct {
 	Commitment []byte `protobuf:"bytes,1,opt,name=commitment,proto3" json:"commitment,omitempty"`
 }
 
-func (x *Round1Msg) Reset() {
-	*x = Round1Msg{}
+func (x *KGRound1Msg) Reset() {
+	*x = KGRound1Msg{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_gg20_types_messages_proto_msgTypes[0]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -38,13 +38,13 @@ func (x *Round1Msg) Reset() {
 	}
 }
 
-func (x *Round1Msg) String() string {
+func (x *KGRound1Msg) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Round1Msg) ProtoMessage() {}
+func (*KGRound1Msg) ProtoMessage() {}
 
-func (x *Round1Msg) ProtoReflect() protoreflect.Message {
+func (x *KGRound1Msg) ProtoReflect() protoreflect.Message {
 	mi := &file_gg20_types_messages_proto_msgTypes[0]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -56,19 +56,19 @@ func (x *Round1Msg) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Round1Msg.ProtoReflect.Descriptor instead.
-func (*Round1Msg) Descriptor() ([]byte, []int) {
+// Deprecated: Use KGRound1Msg.ProtoReflect.Descriptor instead.
+func (*KGRound1Msg) Descriptor() ([]byte, []int) {
 	return file_gg20_types_messages_proto_rawDescGZIP(), []int{0}
 }
 
-func (x *Round1Msg) GetCommitment() []byte {
+func (x *KGRound1Msg) GetCommitment() []byte {
 	if x != nil {
 		return x.Commitment
 	}
 	return nil
 }
 
-type Round2Msg struct {
+type KGRound2Msg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -77,8 +77,8 @@ type Round2Msg struct {
 	BlindFactor  []byte   `protobuf:"bytes,2,opt,name=blind_factor,json=blindFactor,proto3" json:"blind_factor,omitempty"`
 }
 
-func (x *Round2Msg) Reset() {
-	*x = Round2Msg{}
+func (x *KGRound2Msg) Reset() {
+	*x = KGRound2Msg{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_gg20_types_messages_proto_msgTypes[1]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -86,13 +86,13 @@ func (x *Round2Msg) Reset() {
 	}
 }
 
-func (x *Round2Msg) String() string {
+func (x *KGRound2Msg) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Round2Msg) ProtoMessage() {}
+func (*KGRound2Msg) ProtoMessage() {}
 
-func (x *Round2Msg) ProtoReflect() protoreflect.Message {
+func (x *KGRound2Msg) ProtoReflect() protoreflect.Message {
 	mi := &file_gg20_types_messages_proto_msgTypes[1]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -104,26 +104,26 @@ func (x *Round2Msg) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Round2Msg.ProtoReflect.Descriptor instead.
-func (*Round2Msg) Descriptor() ([]byte, []int) {
+// Deprecated: Use KGRound2Msg.ProtoReflect.Descriptor instead.
+func (*KGRound2Msg) Descriptor() ([]byte, []int) {
 	return file_gg20_types_messages_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *Round2Msg) GetDecommitment() [][]byte {
+func (x *KGRound2Msg) GetDecommitment() [][]byte {
 	if x != nil {
 		return x.Decommitment
 	}
 	return nil
 }
 
-func (x *Round2Msg) GetBlindFactor() []byte {
+func (x *KGRound2Msg) GetBlindFactor() []byte {
 	if x != nil {
 		return x.BlindFactor
 	}
 	return nil
 }
 
-type Round3Msg struct {
+type KGRound3Msg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -131,8 +131,8 @@ type Round3Msg struct {
 	Share []byte `protobuf:"bytes,3,opt,name=share,proto3" json:"share,omitempty"`
 }
 
-func (x *Round3Msg) Reset() {
-	*x = Round3Msg{}
+func (x *KGRound3Msg) Reset() {
+	*x = KGRound3Msg{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_gg20_types_messages_proto_msgTypes[2]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -140,13 +140,13 @@ func (x *Round3Msg) Reset() {
 	}
 }
 
-func (x *Round3Msg) String() string {
+func (x *KGRound3Msg) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Round3Msg) ProtoMessage() {}
+func (*KGRound3Msg) ProtoMessage() {}
 
-func (x *Round3Msg) ProtoReflect() protoreflect.Message {
+func (x *KGRound3Msg) ProtoReflect() protoreflect.Message {
 	mi := &file_gg20_types_messages_proto_msgTypes[2]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -158,19 +158,19 @@ func (x *Round3Msg) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Round3Msg.ProtoReflect.Descriptor instead.
-func (*Round3Msg) Descriptor() ([]byte, []int) {
+// Deprecated: Use KGRound3Msg.ProtoReflect.Descriptor instead.
+func (*KGRound3Msg) Descriptor() ([]byte, []int) {
 	return file_gg20_types_messages_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *Round3Msg) GetShare() []byte {
+func (x *KGRound3Msg) GetShare() []byte {
 	if x != nil {
 		return x.Share
 	}
 	return nil
 }
 
-type Round4Msg struct {
+type KGRound4Msg struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -180,8 +180,8 @@ type Round4Msg struct {
 	ChallengeResponse []byte `protobuf:"bytes,3,opt,name=challenge_response,json=challengeResponse,proto3" json:"challenge_response,omitempty"`
 }
 
-func (x *Round4Msg) Reset() {
-	*x = Round4Msg{}
+func (x *KGRound4Msg) Reset() {
+	*x = KGRound4Msg{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_gg20_types_messages_proto_msgTypes[3]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -189,13 +189,13 @@ func (x *Round4Msg) Reset() {
 	}
 }
 
-func (x *Round4Msg) String() string {
+func (x *KGRound4Msg) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*Round4Msg) ProtoMessage() {}
+func (*KGRound4Msg) ProtoMessage() {}
 
-func (x *Round4Msg) ProtoReflect() protoreflect.Message {
+func (x *KGRound4Msg) ProtoReflect() protoreflect.Message {
 	mi := &file_gg20_types_messages_proto_msgTypes[3]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -207,26 +207,26 @@ func (x *Round4Msg) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use Round4Msg.ProtoReflect.Descriptor instead.
-func (*Round4Msg) Descriptor() ([]byte, []int) {
+// Deprecated: Use KGRound4Msg.ProtoReflect.Descriptor instead.
+func (*KGRound4Msg) Descriptor() ([]byte, []int) {
 	return file_gg20_types_messages_proto_rawDescGZIP(), []int{3}
 }
 
-func (x *Round4Msg) GetCommitment() []byte {
+func (x *KGRound4Msg) GetCommitment() []byte {
 	if x != nil {
 		return x.Commitment
 	}
 	return nil
 }
 
-func (x *Round4Msg) GetPubKey() []byte {
+func (x *KGRound4Msg) GetPubKey() []byte {
 	if x != nil {
 		return x.PubKey
 	}
 	return nil
 }
 
-func (x *Round4Msg) GetChallengeResponse() []byte {
+func (x *KGRound4Msg) GetChallengeResponse() []byte {
 	if x != nil {
 		return x.ChallengeResponse
 	}
@@ -238,10 +238,10 @@ type KeygenMsgBody struct {
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
 
-	Round1 *Round1Msg `protobuf:"bytes,1,opt,name=round1,proto3" json:"round1,omitempty"`
-	Round2 *Round2Msg `protobuf:"bytes,2,opt,name=round2,proto3" json:"round2,omitempty"`
-	Round3 *Round3Msg `protobuf:"bytes,3,opt,name=round3,proto3" json:"round3,omitempty"`
-	Round4 *Round4Msg `protobuf:"bytes,4,opt,name=round4,proto3" json:"round4,omitempty"`
+	Round1 *KGRound1Msg `protobuf:"bytes,1,opt,name=round1,proto3" json:"round1,omitempty"`
+	Round2 *KGRound2Msg `protobuf:"bytes,2,opt,name=round2,proto3" json:"round2,omitempty"`
+	Round3 *KGRound3Msg `protobuf:"bytes,3,opt,name=round3,proto3" json:"round3,omitempty"`
+	Round4 *KGRound4Msg `protobuf:"bytes,4,opt,name=round4,proto3" json:"round4,omitempty"`
 }
 
 func (x *KeygenMsgBody) Reset() {
@@ -276,28 +276,28 @@ func (*KeygenMsgBody) Descriptor() ([]byte, []int) {
 	return file_gg20_types_messages_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *KeygenMsgBody) GetRound1() *Round1Msg {
+func (x *KeygenMsgBody) GetRound1() *KGRound1Msg {
 	if x != nil {
 		return x.Round1
 	}
 	return nil
 }
 
-func (x *KeygenMsgBody) GetRound2() *Round2Msg {
+func (x *KeygenMsgBody) GetRound2() *KGRound2Msg {
 	if x != nil {
 		return x.Round2
 	}
 	return nil
 }
 
-func (x *KeygenMsgBody) GetRound3() *Round3Msg {
+func (x *KeygenMsgBody) GetRound3() *KGRound3Msg {
 	if x != nil {
 		return x.Round3
 	}
 	return nil
 }
 
-func (x *KeygenMsgBody) GetRound4() *Round4Msg {
+func (x *KeygenMsgBody) GetRound4() *KGRound4Msg {
 	if x != nil {
 		return x.Round4
 	}
@@ -306,7 +306,7 @@ func (x *KeygenMsgBody) GetRound4() *Round4Msg {
 
 //
 // It has the same shape as base.Message except the data is parsed into KeygenMsgBody
-type ParsedMessage struct {
+type ParsedKGMessage struct {
 	state         protoimpl.MessageState
 	sizeCache     protoimpl.SizeCache
 	unknownFields protoimpl.UnknownFields
@@ -316,8 +316,8 @@ type ParsedMessage struct {
 	Signature []byte               `protobuf:"bytes,3,opt,name=signature,proto3" json:"signature,omitempty"`
 }
 
-func (x *ParsedMessage) Reset() {
-	*x = ParsedMessage{}
+func (x *ParsedKGMessage) Reset() {
+	*x = ParsedKGMessage{}
 	if protoimpl.UnsafeEnabled {
 		mi := &file_gg20_types_messages_proto_msgTypes[5]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -325,13 +325,13 @@ func (x *ParsedMessage) Reset() {
 	}
 }
 
-func (x *ParsedMessage) String() string {
+func (x *ParsedKGMessage) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*ParsedMessage) ProtoMessage() {}
+func (*ParsedKGMessage) ProtoMessage() {}
 
-func (x *ParsedMessage) ProtoReflect() protoreflect.Message {
+func (x *ParsedKGMessage) ProtoReflect() protoreflect.Message {
 	mi := &file_gg20_types_messages_proto_msgTypes[5]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -343,26 +343,26 @@ func (x *ParsedMessage) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use ParsedMessage.ProtoReflect.Descriptor instead.
-func (*ParsedMessage) Descriptor() ([]byte, []int) {
+// Deprecated: Use ParsedKGMessage.ProtoReflect.Descriptor instead.
+func (*ParsedKGMessage) Descriptor() ([]byte, []int) {
 	return file_gg20_types_messages_proto_rawDescGZIP(), []int{5}
 }
 
-func (x *ParsedMessage) GetHeader() *types.MessageHeader {
+func (x *ParsedKGMessage) GetHeader() *types.MessageHeader {
 	if x != nil {
 		return x.Header
 	}
 	return nil
 }
 
-func (x *ParsedMessage) GetBody() *KeygenMsgBody {
+func (x *ParsedKGMessage) GetBody() *KeygenMsgBody {
 	if x != nil {
 		return x.Body
 	}
 	return nil
 }
 
-func (x *ParsedMessage) GetSignature() []byte {
+func (x *ParsedKGMessage) GetSignature() []byte {
 	if x != nil {
 		return x.Signature
 	}
@@ -433,21 +433,21 @@ func file_gg20_types_messages_proto_rawDescGZIP() []byte {
 
 var file_gg20_types_messages_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_gg20_types_messages_proto_goTypes = []interface{}{
-	(*Round1Msg)(nil),           // 0: ssv.gg20.Round1Msg
-	(*Round2Msg)(nil),           // 1: ssv.gg20.Round2Msg
-	(*Round3Msg)(nil),           // 2: ssv.gg20.Round3Msg
-	(*Round4Msg)(nil),           // 3: ssv.gg20.Round4Msg
+	(*KGRound1Msg)(nil),         // 0: ssv.gg20.KGRound1Msg
+	(*KGRound2Msg)(nil),         // 1: ssv.gg20.KGRound2Msg
+	(*KGRound3Msg)(nil),         // 2: ssv.gg20.KGRound3Msg
+	(*KGRound4Msg)(nil),         // 3: ssv.gg20.KGRound4Msg
 	(*KeygenMsgBody)(nil),       // 4: ssv.gg20.KeygenMsgBody
-	(*ParsedMessage)(nil),       // 5: ssv.gg20.ParsedMessage
+	(*ParsedKGMessage)(nil),     // 5: ssv.gg20.ParsedKGMessage
 	(*types.MessageHeader)(nil), // 6: ssv.dkg.types.MessageHeader
 }
 var file_gg20_types_messages_proto_depIdxs = []int32{
-	0, // 0: ssv.gg20.KeygenMsgBody.round1:type_name -> ssv.gg20.Round1Msg
-	1, // 1: ssv.gg20.KeygenMsgBody.round2:type_name -> ssv.gg20.Round2Msg
-	2, // 2: ssv.gg20.KeygenMsgBody.round3:type_name -> ssv.gg20.Round3Msg
-	3, // 3: ssv.gg20.KeygenMsgBody.round4:type_name -> ssv.gg20.Round4Msg
-	6, // 4: ssv.gg20.ParsedMessage.header:type_name -> ssv.dkg.types.MessageHeader
-	4, // 5: ssv.gg20.ParsedMessage.body:type_name -> ssv.gg20.KeygenMsgBody
+	0, // 0: ssv.gg20.KeygenMsgBody.round1:type_name -> ssv.gg20.KGRound1Msg
+	1, // 1: ssv.gg20.KeygenMsgBody.round2:type_name -> ssv.gg20.KGRound2Msg
+	2, // 2: ssv.gg20.KeygenMsgBody.round3:type_name -> ssv.gg20.KGRound3Msg
+	3, // 3: ssv.gg20.KeygenMsgBody.round4:type_name -> ssv.gg20.KGRound4Msg
+	6, // 4: ssv.gg20.ParsedKGMessage.header:type_name -> ssv.dkg.types.MessageHeader
+	4, // 5: ssv.gg20.ParsedKGMessage.body:type_name -> ssv.gg20.KeygenMsgBody
 	6, // [6:6] is the sub-list for method output_type
 	6, // [6:6] is the sub-list for method input_type
 	6, // [6:6] is the sub-list for extension type_name
@@ -462,7 +462,7 @@ func file_gg20_types_messages_proto_init() {
 	}
 	if !protoimpl.UnsafeEnabled {
 		file_gg20_types_messages_proto_msgTypes[0].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Round1Msg); i {
+			switch v := v.(*KGRound1Msg); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -474,7 +474,7 @@ func file_gg20_types_messages_proto_init() {
 			}
 		}
 		file_gg20_types_messages_proto_msgTypes[1].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Round2Msg); i {
+			switch v := v.(*KGRound2Msg); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -486,7 +486,7 @@ func file_gg20_types_messages_proto_init() {
 			}
 		}
 		file_gg20_types_messages_proto_msgTypes[2].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Round3Msg); i {
+			switch v := v.(*KGRound3Msg); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -498,7 +498,7 @@ func file_gg20_types_messages_proto_init() {
 			}
 		}
 		file_gg20_types_messages_proto_msgTypes[3].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*Round4Msg); i {
+			switch v := v.(*KGRound4Msg); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -522,7 +522,7 @@ func file_gg20_types_messages_proto_init() {
 			}
 		}
 		file_gg20_types_messages_proto_msgTypes[5].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*ParsedMessage); i {
+			switch v := v.(*ParsedKGMessage); i {
 			case 0:
 				return &v.state
 			case 1:

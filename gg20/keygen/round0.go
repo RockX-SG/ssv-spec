@@ -10,14 +10,14 @@ func (k *Keygen) r0Proceed() error {
 		return ErrInvalidRound
 	}
 
-	msg := &types2.ParsedMessage{
+	msg := &types2.ParsedKGMessage{
 		Header: &types.MessageHeader{
 			MsgType:  k.HandleMessageType,
 			Sender:   k.PartyI,
 			Receiver: 0,
 		},
 		Body: &types2.KeygenMsgBody{
-			Round1: &types2.Round1Msg{
+			Round1: &types2.KGRound1Msg{
 				Commitment: k.GetCommitment(),
 			},
 		},

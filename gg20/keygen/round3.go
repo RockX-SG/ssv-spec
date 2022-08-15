@@ -38,7 +38,7 @@ func (k *Keygen) r3Proceed() error {
 		RandomNumber: k.DlogR,
 	}
 	proof := knowledge.Prove()
-	msg := &types2.ParsedMessage{
+	msg := &types2.ParsedKGMessage{
 		Header: &types.MessageHeader{
 			SessionId: k.SessionID,
 			MsgType:   k.HandleMessageType,
@@ -46,7 +46,7 @@ func (k *Keygen) r3Proceed() error {
 			Receiver:  0,
 		},
 		Body: &types2.KeygenMsgBody{
-			Round4: &types2.Round4Msg{
+			Round4: &types2.KGRound4Msg{
 				Commitment:        proof.Commitment.Serialize(),
 				PubKey:            proof.PubKey.Serialize(),
 				ChallengeResponse: proof.Response.Serialize(),
