@@ -37,3 +37,42 @@ message ParsedKGMessage {
   KeygenMsgBody body = 2;
   bytes signature = 3;
 }
+
+message RsRound1Msg{
+  bytes commitment = 1;
+}
+
+message RsRound2Msg{
+}
+
+message RsRound3Msg{
+  repeated bytes decommitment = 1;
+  bytes blind_factor = 2;
+}
+
+message RsRound4Msg {
+  bytes share = 3 ;
+}
+
+message RsRound5Msg {
+  bytes commitment = 1;
+  bytes pub_key = 2;
+  bytes challenge_response = 3;
+}
+
+message ResharingMsgBody {
+  RsRound1Msg round1 = 1;
+  RsRound2Msg round2 = 2;
+  RsRound3Msg round3 = 3;
+  RsRound4Msg round4 = 4;
+  RsRound5Msg round5 = 5;
+}
+
+/*
+ * It has the same shape as base.Message except the data is parsed into KeygenMsgBody
+ */
+message ParsedRsMessage {
+  ssv.dkg.types.MessageHeader header = 1;
+  ResharingMsgBody body = 2;
+  bytes signature = 3;
+}
