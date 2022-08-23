@@ -2,19 +2,20 @@ package gg20
 
 import (
 	"errors"
-	"github.com/bloxapp/ssv-spec/dkg/types"
+	"github.com/bloxapp/ssv-spec/dkg"
 	types2 "github.com/bloxapp/ssv-spec/gg20/types"
+	"github.com/bloxapp/ssv-spec/types"
 	log "github.com/sirupsen/logrus"
 	"time"
 )
 
 type Runner struct {
 	Keygen   *Keygen
-	incoming <-chan types.Message
-	outgoing chan<- types.Message
+	incoming <-chan types.SSVMessage
+	outgoing chan<- types.SSVMessage
 }
 
-func NewRunner(identifier types.RequestID, i, t uint64, committee []uint64, incoming <-chan types.Message, outgoing chan<- types.Message) (*Runner, error) {
+func NewRunner(identifier dkg.RequestID, i, t uint64, committee []uint64, incoming <-chan types.SSVMessage, outgoing chan<- types.SSVMessage) (*Runner, error) {
 	kg, err := NewKeygen(identifier[:], i, t, committee)
 	if err != nil {
 		return nil, err
@@ -39,26 +40,17 @@ func (r *Runner) ProcessLoop() {
 		select {
 		case msg, ok := <-r.incoming:
 			if ok {
-				parsed := &types2.ParsedMessage{}
-				if err := parsed.FromBase(&msg); err == nil {
-					r.Keygen.PushMessage(parsed)
-				} else {
+				err := r.process(msg)
+				if err != nil {
 					// TODO: Log error
 				}
-
 			}
 		case <-time.After(1 * time.Second):
 			finished = r.Keygen.Output != nil
 			_ = r.Keygen.Proceed()
 			if outgoing, _ := r.Keygen.GetOutgoing(); outgoing != nil {
 				for _, out := range outgoing {
-					if msg, err := out.ToBase(); err == nil {
-						r.outgoing <- *msg
-					} else {
-						// TODO: Standardize log error
-						log.Errorf("err: %v", err)
-					}
-
+					r.signAndBroadcast(out)
 				}
 			}
 			if finished {
@@ -66,6 +58,37 @@ func (r *Runner) ProcessLoop() {
 			}
 		}
 	}
+}
+func (r *Runner) process(msg types.SSVMessage) error {
+	if msg.MsgType != types.DKGMsgType {
+		return errors.New("not a DKGMsgType")
+
+	}
+	signedMsg := &dkg.SignedMessage{}
+	err := signedMsg.Decode(msg.Data)
+	if err != nil {
+		return err
+	}
+	if signedMsg.Message.MsgType != dkg.ProtocolMsgType {
+		return errors.New("not a ProtocolMsgType")
+	}
+	parsed := &types2.KeygenMessage{}
+	if err := parsed.Decode(signedMsg.Message.Data); err != nil {
+		return err
+	} else {
+		r.Keygen.PushMessage(uint64(signedMsg.Signer), parsed)
+	}
+	return nil
+}
+
+func (r *Runner) signAndBroadcast(msg *types2.KeygenMessage) {
+	panic("implement")
+	//if msg, err := out.ToBase(); err == nil {
+	//	r.outgoing <- *msg
+	//} else {
+	//	// TODO: Standardize log error
+	//	log.Errorf("err: %v", err)
+	//}
 }
 
 func (r *Runner) trace(funcName string, result interface{}) {

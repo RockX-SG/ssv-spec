@@ -1,7 +1,6 @@
 package gg20
 
 import (
-	"github.com/bloxapp/ssv-spec/dkg/types"
 	types2 "github.com/bloxapp/ssv-spec/gg20/types"
 )
 
@@ -10,16 +9,9 @@ func (k *Keygen) r0Proceed() error {
 		return ErrInvalidRound
 	}
 
-	msg := &types2.ParsedMessage{
-		Header: &types.MessageHeader{
-			MsgType:  k.HandleMessageType,
-			Sender:   k.PartyI,
-			Receiver: 0,
-		},
-		Body: &types2.KeygenMsgBody{
-			Round1: &types2.Round1Msg{
-				Commitment: k.GetCommitment(),
-			},
+	msg := &types2.KeygenMessage{
+		Round1: &types2.Round1Msg{
+			Commitment: k.GetCommitment(),
 		},
 	}
 	k.pushOutgoing(msg)

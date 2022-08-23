@@ -11,7 +11,7 @@ import (
 type MsgProcessingSpecTest struct {
 	Name          string
 	Pre           types.Protocol
-	Messages      []*types2.ParsedMessage
+	Messages      []*types2.KeygenMessage
 	Output        *types.LocalKeyShare
 	KeySet        *testingutils.TestKeySet
 	ExpectedError string

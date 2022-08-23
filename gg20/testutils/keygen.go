@@ -70,8 +70,8 @@ func (s DkgPartyDataSet) MakeLocalKeyShare(index uint64) *dkgtypes.LocalKeyShare
 	}
 }
 
-func (s DkgPartyDataSet) R1(operatorId types.OperatorID) *types2.ParsedMessage {
-	return &types2.ParsedMessage{
+func (s DkgPartyDataSet) R1(operatorId types.OperatorID) *types2.KeygenMessage {
+	return &types2.KeygenMessage{
 		Header: &dkgtypes.MessageHeader{
 			MsgType: int32(dkgtypes.ProtocolMsgType),
 			Sender:  uint64(operatorId),
@@ -85,8 +85,8 @@ func (s DkgPartyDataSet) R1(operatorId types.OperatorID) *types2.ParsedMessage {
 	}
 }
 
-func (s DkgPartyDataSet) R2(operatorId types.OperatorID) *types2.ParsedMessage {
-	return &types2.ParsedMessage{
+func (s DkgPartyDataSet) R2(operatorId types.OperatorID) *types2.KeygenMessage {
+	return &types2.KeygenMessage{
 		Header: &dkgtypes.MessageHeader{
 			MsgType: int32(dkgtypes.ProtocolMsgType),
 			Sender:  uint64(operatorId),
@@ -101,8 +101,8 @@ func (s DkgPartyDataSet) R2(operatorId types.OperatorID) *types2.ParsedMessage {
 	}
 }
 
-func (s DkgPartyDataSet) R3(operatorId types.OperatorID, receiver types.OperatorID) *types2.ParsedMessage {
-	return &types2.ParsedMessage{
+func (s DkgPartyDataSet) R3(operatorId types.OperatorID, receiver types.OperatorID) *types2.KeygenMessage {
+	return &types2.KeygenMessage{
 		Header: &dkgtypes.MessageHeader{
 			MsgType:  int32(dkgtypes.ProtocolMsgType),
 			Sender:   uint64(operatorId),
@@ -117,8 +117,8 @@ func (s DkgPartyDataSet) R3(operatorId types.OperatorID, receiver types.Operator
 	}
 }
 
-func (s DkgPartyDataSet) R4(operatorId types.OperatorID) *types2.ParsedMessage {
-	return &types2.ParsedMessage{
+func (s DkgPartyDataSet) R4(operatorId types.OperatorID) *types2.KeygenMessage {
+	return &types2.KeygenMessage{
 		Header: &dkgtypes.MessageHeader{
 			MsgType: int32(dkgtypes.ProtocolMsgType),
 			Sender:  uint64(operatorId),
@@ -150,10 +150,10 @@ type KeygenPartyData struct {
 	Coefficients  [][]byte
 	BlindFactor   []byte
 	DlogR         []byte
-	R1Message     types2.ParsedMessage
-	R2Message     types2.ParsedMessage
-	R3Messages    []types2.ParsedMessage
-	R4Message     types2.ParsedMessage
+	R1Message     types2.KeygenMessage
+	R2Message     types2.KeygenMessage
+	R3Messages    []types2.KeygenMessage
+	R4Message     types2.KeygenMessage
 	OwnShare      []byte
 	LocalKeyShare dkgtypes.LocalKeyShare
 }

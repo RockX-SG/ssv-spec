@@ -4,7 +4,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"github.com/bloxapp/ssv-spec/dkg/types"
 	"github.com/bloxapp/ssv-spec/gg20/algorithms/vss"
 	types2 "github.com/bloxapp/ssv-spec/gg20/types"
 	"github.com/herumi/bls-eth-go-binary/bls"
@@ -41,17 +40,10 @@ func (k *Keygen) r2Proceed() error {
 	for i, share := range allShares {
 		receiver := k.Committee[i]
 		if i+1 != int(k.PartyI) {
-			msg := &types2.ParsedMessage{
-				Header: &types.MessageHeader{
-					SessionId: k.SessionID,
-					MsgType:   k.HandleMessageType,
-					Sender:    k.PartyI,
-					Receiver:  receiver,
-				},
-				Body: &types2.KeygenMsgBody{
-					Round3: &types2.Round3Msg{
-						Share: share.Share.Serialize(),
-					},
+			msg := &types2.KeygenMessage{
+				Receiver: receiver,
+				Round3: &types2.Round3Msg{
+					Share: share.Share.Serialize(),
 				},
 			}
 			k.pushOutgoing(msg)
@@ -71,12 +63,12 @@ func (k *Keygen) r2CanProceed() error {
 	for _, id := range k.Committee {
 		r1Msg := k.Round1Msgs[id]
 		r2Msg := k.Round2Msgs[id]
-		if r1Msg == nil || r2Msg == nil || r1Msg.Body.Round1 == nil || r2Msg.Body.Round2 == nil {
+		if r1Msg == nil || r2Msg == nil || r1Msg.Round1 == nil || r2Msg.Round2 == nil {
 			return ErrExpectMessage
 		}
-		if !k.VerifyCommitment(*r1Msg.Body.Round1, *r2Msg.Body.Round2, r2Msg.Header.Sender) {
+		if !k.VerifyCommitment(*r1Msg.Round1, *r2Msg.Round2, id) {
 			// TODO: Handle blame?
-			return fmt.Errorf("decomm doesn't match comm for party %d", r2Msg.Header.Sender)
+			return fmt.Errorf("decomm doesn't match comm for party %d", id)
 		}
 	}
 	return nil

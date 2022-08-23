@@ -2,9 +2,9 @@ package gg20
 
 import (
 	"errors"
-	"github.com/bloxapp/ssv-spec/dkg/types"
+	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/gg20/algorithms/dlog"
-	"github.com/gogo/protobuf/sortkeys"
+	"github.com/bloxapp/ssv-spec/types"
 	"github.com/herumi/bls-eth-go-binary/bls"
 )
 
@@ -17,25 +17,25 @@ func (k *Keygen) r4Proceed() error {
 		return ErrInvalidRound
 	}
 
-	pk := new(bls.PublicKey)
+	valPK := new(bls.PublicKey)
 	for _, r2Msg := range k.Round2Msgs {
 		temp := new(bls.PublicKey)
-		temp.Deserialize(r2Msg.Body.Round2.Decommitment[0])
-		pk.Add(temp)
+		temp.Deserialize(r2Msg.Round2.Decommitment[0])
+		valPK.Add(temp)
 	}
-	var vkVec [][]byte
-	sortkeys.Uint64s(k.Committee)
+	var vkVec map[types.OperatorID]*bls.PublicKey
 	for _, id := range k.Committee {
 		r4Msg := k.Round4Msgs[id]
-		vkVec = append(vkVec, r4Msg.Body.Round4.PubKey)
+		pk := new(bls.PublicKey)
+		pk.Deserialize(r4Msg.Round4.PubKey)
+		vkVec[types.OperatorID(id)] = pk
 	}
-	k.Output = &types.LocalKeyShare{
-		Index:           k.PartyI,
+
+	k.Output = &dkg.KeyGenOutput{
+		Share:           k.skI,
+		OperatorPubKeys: vkVec,
+		ValidatorPK:     valPK.Serialize(),
 		Threshold:       uint64(len(k.Coefficients) - 1),
-		PublicKey:       pk.Serialize(),
-		SecretShare:     k.skI.Serialize(),
-		Committee:       k.Committee,
-		SharePublicKeys: vkVec,
 	}
 	k.Round = 5
 	return nil
@@ -47,7 +47,7 @@ func (k *Keygen) r4CanProceed() error {
 	}
 	for _, id := range k.Committee {
 		r4Msg := k.Round4Msgs[id]
-		if r4Msg == nil || r4Msg.Body.Round4 == nil {
+		if r4Msg == nil || r4Msg.Round4 == nil {
 			return ErrExpectMessage
 		}
 		proof := &dlog.Proof{
@@ -55,9 +55,9 @@ func (k *Keygen) r4CanProceed() error {
 			PubKey:     new(bls.PublicKey),
 			Response:   new(bls.Fr),
 		}
-		proof.Commitment.Deserialize(r4Msg.Body.Round4.Commitment)
-		proof.PubKey.Deserialize(r4Msg.Body.Round4.PubKey)
-		proof.Response.Deserialize(r4Msg.Body.Round4.ChallengeResponse)
+		proof.Commitment.Deserialize(r4Msg.Round4.Commitment)
+		proof.PubKey.Deserialize(r4Msg.Round4.PubKey)
+		proof.Response.Deserialize(r4Msg.Round4.ChallengeResponse)
 		if !proof.Verify() {
 			return ErrInvalidProof
 		}

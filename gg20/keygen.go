@@ -7,7 +7,7 @@ import (
 	_ "crypto/sha256"
 	"errors"
 	"fmt"
-	"github.com/bloxapp/ssv-spec/dkg/types"
+	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/gg20/algorithms/vss"
 	types2 "github.com/bloxapp/ssv-spec/gg20/types"
 	"github.com/herumi/bls-eth-go-binary/bls"
@@ -41,12 +41,12 @@ type Keygen struct {
 	PartyI            uint64
 	PartyCount        uint64
 	skI               *bls.SecretKey
-	Round1Msgs        map[uint64]*types2.ParsedMessage
-	Round2Msgs        map[uint64]*types2.ParsedMessage
-	Round3Msgs        map[uint64]*types2.ParsedMessage
-	Round4Msgs        map[uint64]*types2.ParsedMessage
-	Outgoing          types2.ParsedMessages
-	Output            *types.LocalKeyShare
+	Round1Msgs        map[uint64]*types2.KeygenMessage
+	Round2Msgs        map[uint64]*types2.KeygenMessage
+	Round3Msgs        map[uint64]*types2.KeygenMessage
+	Round4Msgs        map[uint64]*types2.KeygenMessage
+	Outgoing          types2.KeygenMessages
+	Output            *dkg.KeyGenOutput
 	HandleMessageType int32
 	ownShare          *bls.Fr
 	inMutex           sync.Mutex
@@ -64,13 +64,13 @@ func EmptyKeygen(t, n uint64) Keygen {
 		PartyI:            0,
 		PartyCount:        n,
 		skI:               nil,
-		Round1Msgs:        make(map[uint64]*types2.ParsedMessage, n),
-		Round2Msgs:        make(map[uint64]*types2.ParsedMessage, n),
-		Round3Msgs:        make(map[uint64]*types2.ParsedMessage, n),
-		Round4Msgs:        make(map[uint64]*types2.ParsedMessage, n),
+		Round1Msgs:        make(map[uint64]*types2.KeygenMessage, n),
+		Round2Msgs:        make(map[uint64]*types2.KeygenMessage, n),
+		Round3Msgs:        make(map[uint64]*types2.KeygenMessage, n),
+		Round4Msgs:        make(map[uint64]*types2.KeygenMessage, n),
 		Outgoing:          nil,
 		Output:            nil,
-		HandleMessageType: int32(types.ProtocolMsgType),
+		HandleMessageType: int32(dkg.ProtocolMsgType),
 		ownShare:          nil,
 		inMutex:           sync.Mutex{},
 		outMutex:          sync.Mutex{},
@@ -157,11 +157,11 @@ func (k *Keygen) ValidSender(sender uint64) bool {
 	return false
 }
 
-func (k *Keygen) PushMessage(msg *types2.ParsedMessage) error {
+func (k *Keygen) PushMessage(sender uint64, msg *types2.KeygenMessage) error {
 	if msg == nil || !msg.IsValid() {
 		return errors.New("invalid message")
 	}
-	if !k.ValidSender(msg.Header.Sender) {
+	if !k.ValidSender(sender) {
 		return errors.New("invalid sender")
 	}
 	rn, err := msg.GetRoundNumber()
@@ -172,23 +172,23 @@ func (k *Keygen) PushMessage(msg *types2.ParsedMessage) error {
 	defer k.inMutex.Unlock()
 	switch rn {
 	case 1:
-		k.Round1Msgs[msg.Header.Sender] = msg
+		k.Round1Msgs[sender] = msg
 		return nil
 	case 2:
-		k.Round2Msgs[msg.Header.Sender] = msg
+		k.Round2Msgs[sender] = msg
 		return nil
 	case 3:
-		k.Round3Msgs[msg.Header.Sender] = msg
+		k.Round3Msgs[sender] = msg
 		return nil
 	case 4:
-		k.Round4Msgs[msg.Header.Sender] = msg
+		k.Round4Msgs[sender] = msg
 		return nil
 	}
 	return errors.New("unable to handle message")
 
 }
 
-func (k *Keygen) GetOutgoing() (types2.ParsedMessages, error) {
+func (k *Keygen) GetOutgoing() (types2.KeygenMessages, error) {
 	if success := k.outMutex.TryLock(); success {
 		defer k.outMutex.Unlock()
 		out := k.Outgoing[:]
@@ -202,7 +202,7 @@ func (k *Keygen) GetOutgoing() (types2.ParsedMessages, error) {
 	}
 }
 
-func (k *Keygen) pushOutgoing(msg *types2.ParsedMessage) {
+func (k *Keygen) pushOutgoing(msg *types2.KeygenMessage) {
 	k.outMutex.Lock()
 	defer k.outMutex.Unlock()
 	k.Outgoing = append(k.Outgoing, msg)

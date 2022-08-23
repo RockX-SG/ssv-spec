@@ -2,7 +2,6 @@ package gg20
 
 import (
 	"errors"
-	"github.com/bloxapp/ssv-spec/dkg/types"
 	"github.com/bloxapp/ssv-spec/gg20/algorithms/dlog"
 	"github.com/bloxapp/ssv-spec/gg20/algorithms/vss"
 	types2 "github.com/bloxapp/ssv-spec/gg20/types"
@@ -21,7 +20,7 @@ func (k *Keygen) calcSkI() *bls.SecretKey {
 			continue
 		}
 		temp := new(bls.SecretKey)
-		temp.Deserialize(r3Msg.Body.Round3.Share)
+		temp.Deserialize(r3Msg.Round3.Share)
 		skI.Add(temp)
 	}
 	return skI
@@ -38,19 +37,11 @@ func (k *Keygen) r3Proceed() error {
 		RandomNumber: k.DlogR,
 	}
 	proof := knowledge.Prove()
-	msg := &types2.ParsedMessage{
-		Header: &types.MessageHeader{
-			SessionId: k.SessionID,
-			MsgType:   k.HandleMessageType,
-			Sender:    k.PartyI,
-			Receiver:  0,
-		},
-		Body: &types2.KeygenMsgBody{
-			Round4: &types2.Round4Msg{
-				Commitment:        proof.Commitment.Serialize(),
-				PubKey:            proof.PubKey.Serialize(),
-				ChallengeResponse: proof.Response.Serialize(),
-			},
+	msg := &types2.KeygenMessage{
+		Round4: &types2.Round4Msg{
+			Commitment:        proof.Commitment.Serialize(),
+			PubKey:            proof.PubKey.Serialize(),
+			ChallengeResponse: proof.Response.Serialize(),
 		},
 	}
 	k.pushOutgoing(msg)
@@ -69,10 +60,10 @@ func (k *Keygen) r3CanProceed() error {
 		}
 		r3Msg := k.Round3Msgs[ind]
 		r2Msg := k.Round2Msgs[ind]
-		if r2Msg == nil || r2Msg.Body.Round2 == nil || r2Msg.Body.Round2.Decommitment == nil || r3Msg == nil || r3Msg.Body.Round3 == nil {
+		if r2Msg == nil || r2Msg.Round2 == nil || r2Msg.Round2.Decommitment == nil || r3Msg == nil || r3Msg.Round3 == nil {
 			return ErrExpectMessage
 		}
-		shareBytes := r3Msg.Body.Round3.Share
+		shareBytes := r3Msg.Round3.Share
 		share := &vss.Share{
 			Threshold: len(k.Coefficients) - 1,
 			ID:        new(bls.Fr),
@@ -80,11 +71,11 @@ func (k *Keygen) r3CanProceed() error {
 		}
 		share.ID.SetInt64(int64(k.PartyI))
 		share.Share.Deserialize(shareBytes)
-		if r3Msg.Header.Sender == k.PartyI {
+		if ind == k.PartyI {
 			share.Share = k.ownShare
 		}
 		commitments := make([]*bls.PublicKey, len(k.Coefficients))
-		for j, commBytes := range r2Msg.Body.Round2.Decommitment {
+		for j, commBytes := range r2Msg.Round2.Decommitment {
 			// TODO: Improve conversion of multiple times
 			commitments[j] = new(bls.PublicKey)
 			commitments[j].Deserialize(commBytes)
