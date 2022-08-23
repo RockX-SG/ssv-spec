@@ -1,51 +1,87 @@
 package tests
 
 import (
-	"github.com/bloxapp/ssv-spec/dkg/testutils"
-	dkgtypes "github.com/bloxapp/ssv-spec/dkg/types"
+	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/types"
+	"github.com/bloxapp/ssv-spec/types/testingutils"
 )
 
 // HappyFlow tests a simple full happy flow until decided
 func HappyFlow() *MsgProcessingSpecTest {
-	index := 1
-	//ks := testingutils.Testing4SharesSet()
-	dataSet := testutils.TestDepositSignDataSetFourOperators()
-	//pre := testutils.TestRunner(dataSet, *ks, uint64(index))
-	//node := testutils.TestNode(dataSet, uint64(index))
-	messages := map[types.OperatorID]*dkgtypes.Message{
-		2: testutils.SignDKGMsg(dataSet.DKGOperators[2].SK, dataSet.ParsedSignedDepositDataMessage(2)).(*dkgtypes.Message),
-		3: testutils.SignDKGMsg(dataSet.DKGOperators[3].SK, dataSet.ParsedSignedDepositDataMessage(3)).(*dkgtypes.Message),
-		4: testutils.SignDKGMsg(dataSet.DKGOperators[4].SK, dataSet.ParsedSignedDepositDataMessage(4)).(*dkgtypes.Message),
+	ks := testingutils.Testing4SharesSet()
+	identifier := dkg.NewRequestID(ks.DKGOperators[1].ETHAddress, 1)
+	init := &dkg.Init{
+		OperatorIDs:           []types.OperatorID{1, 2, 3, 4},
+		Threshold:             3,
+		WithdrawalCredentials: testingutils.TestingWithdrawalCredentials,
+		Fork:                  testingutils.TestingForkVersion,
 	}
-	prasedMessages := func(msgs map[types.OperatorID]*dkgtypes.Message) map[types.OperatorID]*dkgtypes.ParsedSignedDepositDataMessage {
-		out := map[types.OperatorID]*dkgtypes.ParsedSignedDepositDataMessage{}
-		for _, m := range msgs {
-			parsed := &dkgtypes.ParsedSignedDepositDataMessage{}
-			parsed.FromBase(m)
-			out[types.OperatorID(m.Header.Sender)] = parsed
-		}
-		return out
-	}(messages)
+	initBytes, _ := init.Encode()
+	root := testingutils.DespositDataSigningRoot(ks, init)
 
 	return &MsgProcessingSpecTest{
-		Name:          "happy flow",
-		Operator:      dataSet.Operator(types.OperatorID(index)),
-		LocalKeyShare: dataSet.MakeLocalKeyShare(1),
-		KeySet:        &dataSet.TestKeySet,
-		Output:        prasedMessages,
-		Messages: []*dkgtypes.Message{
-			testutils.SignDKGMsg(dataSet.DKGOperators[1].SK, dataSet.ParsedInitMessage(1)).(*dkgtypes.Message),
-			testutils.SignDKGMsg(dataSet.DKGOperators[1].SK, testutils.PlaceholderMessage()).(*dkgtypes.Message),
-			testutils.SignDKGMsg(dataSet.DKGOperators[2].SK, dataSet.ParsedPartialSigMessage(2)).(*dkgtypes.Message),
-			testutils.SignDKGMsg(dataSet.DKGOperators[3].SK, dataSet.ParsedPartialSigMessage(3)).(*dkgtypes.Message),
-			messages[2],
-			messages[3],
-			messages[4],
+		Name: "happy flow",
+		InputMessages: []*dkg.SignedMessage{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+				MsgType:    dkg.InitMsgType,
+				Identifier: identifier,
+				Data:       initBytes,
+			}),
+			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+				MsgType:    dkg.ProtocolMsgType,
+				Identifier: identifier,
+				Data:       nil, // GLNOTE: Dummy message simulating the KeyGenProtocol to complete
+			}),
+			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+				MsgType:    dkg.DepositDataMsgType,
+				Identifier: identifier,
+				Data:       testingutils.PartialDepositDataBytes(2, root, ks.Shares[2]),
+			}),
+			testingutils.SignDKGMsg(ks.DKGOperators[3].SK, 3, &dkg.Message{
+				MsgType:    dkg.DepositDataMsgType,
+				Identifier: identifier,
+				Data:       testingutils.PartialDepositDataBytes(3, root, ks.Shares[3]),
+			}),
+			testingutils.SignDKGMsg(ks.DKGOperators[4].SK, 4, &dkg.Message{
+				MsgType:    dkg.DepositDataMsgType,
+				Identifier: identifier,
+				Data:       testingutils.PartialDepositDataBytes(4, root, ks.Shares[4]),
+			}),
+			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+				MsgType:    dkg.OutputMsgType,
+				Identifier: identifier,
+				Data:       ks.SignedOutputBytes(identifier, 2, root),
+			}),
+			testingutils.SignDKGMsg(ks.DKGOperators[3].SK, 3, &dkg.Message{
+				MsgType:    dkg.OutputMsgType,
+				Identifier: identifier,
+				Data:       ks.SignedOutputBytes(identifier, 3, root),
+			}),
+			testingutils.SignDKGMsg(ks.DKGOperators[4].SK, 4, &dkg.Message{
+				MsgType:    dkg.OutputMsgType,
+				Identifier: identifier,
+				Data:       ks.SignedOutputBytes(identifier, 4, root),
+			}),
 		},
-		Outgoing: []*dkgtypes.Message{
-			dataSet.ParsedPartialSigMessage(types.OperatorID(index)),
-			dataSet.ParsedSignedDepositDataMessage(types.OperatorID(index)),
+		OutputMessages: []*dkg.SignedMessage{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+				MsgType:    dkg.DepositDataMsgType,
+				Identifier: identifier,
+				Data:       testingutils.PartialDepositDataBytes(1, root, ks.Shares[1]),
+			}),
+			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+				MsgType:    dkg.OutputMsgType,
+				Identifier: identifier,
+				Data:       ks.SignedOutputBytes(identifier, 1, root),
+			}),
 		},
+		Output: map[types.OperatorID]*dkg.SignedOutput{
+			1: ks.SignedOutputObject(identifier, 1, root),
+			2: ks.SignedOutputObject(identifier, 2, root),
+			3: ks.SignedOutputObject(identifier, 3, root),
+			4: ks.SignedOutputObject(identifier, 4, root),
+		},
+		KeySet:        ks,
+		ExpectedError: "",
 	}
 }

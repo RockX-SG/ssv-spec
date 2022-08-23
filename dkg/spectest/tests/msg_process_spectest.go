@@ -1,25 +1,21 @@
 package tests
 
 import (
+	"fmt"
 	"github.com/bloxapp/ssv-spec/dkg"
-	"github.com/bloxapp/ssv-spec/dkg/testutils"
-	dkgtypes "github.com/bloxapp/ssv-spec/dkg/types"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
-	"github.com/golang/protobuf/proto"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
 
 type MsgProcessingSpecTest struct {
-	Name          string
-	Operator      *dkgtypes.Operator
-	LocalKeyShare *dkgtypes.LocalKeyShare
-	Messages      []*dkgtypes.Message
-	Outgoing      []*dkgtypes.Message
-	Output        map[types.OperatorID]*dkgtypes.ParsedSignedDepositDataMessage
-	KeySet        *testingutils.TestKeySet
-	ExpectedError string
+	Name           string
+	InputMessages  []*dkg.SignedMessage
+	OutputMessages []*dkg.SignedMessage
+	Output         map[types.OperatorID]*dkg.SignedOutput
+	KeySet         *testingutils.TestKeySet
+	ExpectedError  string
 }
 
 func (test *MsgProcessingSpecTest) TestName() string {
@@ -27,35 +23,16 @@ func (test *MsgProcessingSpecTest) TestName() string {
 }
 
 func (test *MsgProcessingSpecTest) Run(t *testing.T) {
-	protocol := func(init *dkgtypes.Init, operatorID types.OperatorID, identifier dkgtypes.RequestID) dkgtypes.Protocol {
-		return testutils.MockProtocol{LocalKeyShare: test.LocalKeyShare}
-	}
-	network := testutils.NewMockNetwork()
-	ks := testingutils.Testing13SharesSet()
-	config := &dkgtypes.Config{
-		Protocol:            protocol,
-		BeaconNetwork:       types.PraterNetwork,
-		Network:             network,
-		Storage:             testutils.NewMockStorage(*ks),
-		SignatureDomainType: types.PrimusTestnet,
-		Signer: &testutils.MockSigner{
-			SK:            ks.DKGOperators[1].SK,
-			ETHAddress:    ks.DKGOperators[1].ETHAddress,
-			EncryptionKey: ks.DKGOperators[1].EncryptionKey,
-		},
-	}
-	node := dkg.NewNode(test.Operator, config)
+	node := testingutils.TestingDKGNode(test.KeySet)
 
-	var (
-		lastErr, err error
-		output       map[types.OperatorID]*dkgtypes.ParsedSignedDepositDataMessage
-	)
+	var lastErr error
+	for _, msg := range test.InputMessages {
+		byts, _ := msg.Encode()
+		err := node.ProcessMessage(&types.SSVMessage{
+			MsgType: types.DKGMsgType,
+			Data:    byts,
+		})
 
-	if err != nil {
-		lastErr = err
-	}
-	for _, msg := range test.Messages {
-		err = node.ProcessMessage(msg)
 		if err != nil {
 			lastErr = err
 		}
@@ -66,15 +43,53 @@ func (test *MsgProcessingSpecTest) Run(t *testing.T) {
 	} else {
 		require.NoError(t, lastErr)
 	}
-	outgoing := network.Broadcasted
-	require.Equal(t, len(test.Outgoing), len(outgoing))
-	for i, message := range outgoing {
-		message.Signature = nil // Signature is not deterministic, so skip
-		require.True(t, proto.Equal(outgoing[i], message))
+
+	// test output message
+	broadcastedMsgs := node.GetConfig().Network.(*testingutils.TestingNetwork).BroadcastedMsgs
+	if len(test.OutputMessages) > 0 {
+		require.Len(t, broadcastedMsgs, len(test.OutputMessages))
+
+		for i, msg := range test.OutputMessages {
+			bMsg := broadcastedMsgs[i]
+			require.Equal(t, types.DKGMsgType, bMsg.MsgType)
+			sMsg := &dkg.SignedMessage{}
+			sMsg.Decode(bMsg.Data)
+			if sMsg.Message.MsgType == dkg.OutputMsgType {
+				require.Equal(t, dkg.OutputMsgType, msg.Message.MsgType, "OutputMsgType expected")
+				o1 := &dkg.SignedOutput{}
+				o1.Decode(msg.Message.Data)
+
+				o2 := &dkg.SignedOutput{}
+				o2.Decode(sMsg.Message.Data)
+
+				es1 := o1.Data.EncryptedShare
+				o1.Data.EncryptedShare = nil
+				es2 := o2.Data.EncryptedShare
+				o2.Data.EncryptedShare = nil
+
+				s1, _ := types.Decrypt(test.KeySet.DKGOperators[msg.Signer].EncryptionKey, es1)
+				s2, _ := types.Decrypt(test.KeySet.DKGOperators[msg.Signer].EncryptionKey, es2)
+				require.Equal(t, s1, s2, "shares don't match")
+				r1, _ := o1.Data.GetRoot()
+				r2, _ := o2.Data.GetRoot()
+				require.EqualValues(t, r1, r2, fmt.Sprintf("output msg %d roots not equal", i))
+			} else {
+				r1, _ := msg.GetRoot()
+				r2, _ := sMsg.GetRoot()
+				require.EqualValues(t, r1, r2, fmt.Sprintf("output msg %d roots not equal", i))
+			}
+
+		}
 	}
-	output = test.Output
-	require.Equal(t, len(test.Output), len(output))
-	for id, message := range test.Output {
-		require.True(t, proto.Equal(message, output[id]))
+	streamed := node.GetConfig().Network.(*testingutils.TestingNetwork).DKGOutputs
+	if len(test.Output) > 0 {
+		require.Len(t, streamed, len(test.Output))
+		for id, output := range test.Output {
+			s := streamed[id]
+			require.NotNilf(t, s, "output for operator %d not found", id)
+			r1, _ := output.Data.GetRoot()
+			r2, _ := s.Data.GetRoot()
+			require.EqualValues(t, r1, r2, fmt.Sprintf("output for operator %d roots not equal", id))
+		}
 	}
 }
