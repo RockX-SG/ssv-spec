@@ -3,6 +3,8 @@ package spectest
 import (
 	"github.com/bloxapp/ssv-spec/qbft/spectest/tests"
 	"github.com/bloxapp/ssv-spec/qbft/spectest/tests/commit"
+	"github.com/bloxapp/ssv-spec/qbft/spectest/tests/controller"
+	"github.com/bloxapp/ssv-spec/qbft/spectest/tests/decided"
 	"github.com/bloxapp/ssv-spec/qbft/spectest/tests/messages"
 	"github.com/bloxapp/ssv-spec/qbft/spectest/tests/prepare"
 	"github.com/bloxapp/ssv-spec/qbft/spectest/tests/proposal"
@@ -17,6 +19,18 @@ type SpecTest interface {
 }
 
 var AllTests = []SpecTest{
+	controller.StartInstanceFirstHeight(),
+	controller.StartInstancePreviousDecided(),
+	controller.StartInstancePreviousNotDecided(),
+	controller.StartInstanceInvalidValue(),
+	controller.FirstDecided(),
+	controller.InvalidIdentifier(),
+	controller.NoInstanceRunning(),
+	controller.NotFirstDecided(),
+	controller.NotDecided(),
+	controller.ProcessMsgError(),
+	controller.SavedAndBroadcastedDecided(),
+
 	proposer.FourOperators(),
 	proposer.SevenOperators(),
 	proposer.TenOperators(),
@@ -28,7 +42,6 @@ var AllTests = []SpecTest{
 	messages.RoundChangePrePreparedJustifications(),
 	messages.RoundChangeNotPreparedJustifications(),
 	messages.CommitDataEncoding(),
-	messages.DecidedMsgEncoding(),
 	messages.MsgNilIdentifier(),
 	messages.MsgNonZeroIdentifier(),
 	messages.MsgTypeUnknown(),
@@ -39,6 +52,8 @@ var AllTests = []SpecTest{
 	messages.SignedMsgSigTooShort(),
 	messages.SignedMsgSigTooLong(),
 	messages.SignedMsgNoSigners(),
+	messages.SignedMsgDuplicateSigners(),
+	messages.SignedMsgMultiSigners(),
 	messages.GetRoot(),
 	messages.SignedMessageEncoding(),
 	messages.CreateProposal(),
@@ -49,6 +64,9 @@ var AllTests = []SpecTest{
 	messages.CreateRoundChange(),
 	messages.CreateRoundChangePreviouslyPrepared(),
 	messages.RoundChangeDataEncoding(),
+	messages.PrepareDataInvalid(),
+	messages.CommitDataInvalid(),
+	messages.ProposalDataInvalid(),
 
 	tests.HappyFlow(),
 	tests.SevenOperators(),
@@ -88,6 +106,7 @@ var AllTests = []SpecTest{
 	proposal.WrongHeight(),
 	proposal.WrongProposer(),
 	proposal.WrongSignature(),
+	proposal.UnknownSigner(),
 
 	prepare.DuplicateMsg(),
 	prepare.HappyFlow(),
@@ -101,6 +120,7 @@ var AllTests = []SpecTest{
 	prepare.WrongData(),
 	prepare.WrongHeight(),
 	prepare.WrongSignature(),
+	prepare.UnknownSigner(),
 
 	commit.CurrentRound(),
 	commit.FutureRound(),
@@ -113,23 +133,42 @@ var AllTests = []SpecTest{
 	commit.WrongData2(),
 	commit.MultiSignerWithOverlap(),
 	commit.MultiSignerNoOverlap(),
-	commit.Decided(),
+	commit.DuplicateSigners(),
 	commit.NoPrevAcceptedProposal(),
 	commit.WrongHeight(),
 	commit.ImparsableCommitData(),
 	commit.WrongSignature(),
+	commit.UnknownSigner(),
+	commit.InvalidValCheck(),
+
+	decided.UnknownSigner(),
+	decided.WrongSignature(),
+	decided.WrongHeight(),
+	decided.PostDecided(),
+	decided.SecondMsg(),
+	decided.PastRound(),
+	decided.NoPrevAcceptedProposal(),
+	decided.InvalidValCheckData(),
+	decided.InvalidData(),
+	decided.ImparsableData(),
+	decided.FutureRound(),
+	decided.DuplicateSigners(),
+	decided.DuplicateMsg(),
+	decided.PrevCommitOverlap(),
+	decided.CurrentRound(),
 
 	roundchange.HappyFlow(),
 	roundchange.F1Speedup(),
 	roundchange.F1SpeedupPrepared(),
 	roundchange.WrongHeight(),
 	roundchange.WrongSig(),
+	roundchange.UnknownSigner(),
 	roundchange.MultiSigner(),
 	roundchange.NotPrepared(),
 	roundchange.Prepared(),
 	roundchange.PeerPrepared(),
+	roundchange.PeerPreparedDifferentHeights(),
 	roundchange.JustificationWrongValue(),
-	roundchange.NextProposalValueWrong(),
 	roundchange.JustificationWrongRound(),
 	roundchange.JustificationNoQuorum(),
 	roundchange.JustificationMultiSigners(),

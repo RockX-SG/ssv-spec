@@ -1,9 +1,9 @@
 package spectest
 
 import (
-	"encoding/hex"
 	"encoding/json"
 	"github.com/bloxapp/ssv-spec/qbft"
+	"github.com/bloxapp/ssv-spec/ssv"
 	tests2 "github.com/bloxapp/ssv-spec/ssv/spectest/tests"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
@@ -16,8 +16,8 @@ import (
 
 func TestAll(t *testing.T) {
 	for _, test := range AllTests {
-		t.Run(test.Name, func(t *testing.T) {
-			runTest(t, test)
+		t.Run(test.TestName(), func(t *testing.T) {
+			test.Run(t)
 		})
 	}
 }
@@ -26,7 +26,7 @@ func TestJson(t *testing.T) {
 	basedir, _ := os.Getwd()
 	path := filepath.Join(basedir, "generate")
 	fileName := "tests.json"
-	tests := map[string]*tests2.SpecTest{}
+	tests := map[string]*tests2.MsgProcessingSpecTest{}
 	byteValue, err := ioutil.ReadFile(path + "/" + fileName)
 	require.NoError(t, err)
 
@@ -37,64 +37,43 @@ func TestJson(t *testing.T) {
 	for _, test := range tests {
 
 		// a little trick we do to instantiate all the internal controller params
-		byts, err := test.Runner.QBFTController.Encode()
+		byts, err := test.Runner.GetQBFTController().Encode()
 		require.NoError(t, err)
 
-		ks := keySetForShare(test.Runner.QBFTController.Share)
+		ks := keySetForShare(test.Runner.GetQBFTController().Share)
 
 		newContr := qbft.NewController(
 			[]byte{1, 2, 3, 4},
-			test.Runner.QBFTController.Share,
+			test.Runner.GetQBFTController().Share,
 			testingutils.TestingConfig(ks).Domain,
 			testingutils.TestingConfig(ks).Signer,
 			testingutils.TestingConfig(ks).ValueCheckF,
 			testingutils.TestingConfig(ks).Storage,
 			testingutils.TestingConfig(ks).Network,
+			func(state *qbft.State, round qbft.Round) types.OperatorID {
+				return 1
+			},
 		)
 		require.NoError(t, newContr.Decode(byts))
-		test.Runner.QBFTController = newContr
+		setControllerInRunner(test.Runner, newContr)
 
-		for idx, i := range test.Runner.QBFTController.StoredInstances {
+		for idx, i := range test.Runner.GetQBFTController().StoredInstances {
 			if i == nil {
 				continue
 			}
 			fixedInst := fixQBFTInstanceForRun(t, i, ks)
-			test.Runner.QBFTController.StoredInstances[idx] = fixedInst
+			test.Runner.GetQBFTController().StoredInstances[idx] = fixedInst
 
-			if test.Runner.State != nil &&
-				test.Runner.State.RunningInstance != nil &&
-				test.Runner.State.RunningInstance.GetHeight() == fixedInst.GetHeight() {
-				test.Runner.State.RunningInstance = fixedInst
+			if test.Runner.GetState() != nil &&
+				test.Runner.GetState().RunningInstance != nil &&
+				test.Runner.GetState().RunningInstance.GetHeight() == fixedInst.GetHeight() {
+				test.Runner.GetState().RunningInstance = fixedInst
 			}
 		}
 		t.Run(test.Name, func(t *testing.T) {
-			runTest(t, test)
+			test.Run(t)
 		})
 	}
-}
-
-func runTest(t *testing.T, test *tests2.SpecTest) {
-	v := testingutils.BaseValidator(keySetForShare(test.Runner.Share))
-	v.DutyRunners[test.Runner.BeaconRoleType] = test.Runner
-
-	lastErr := v.StartDuty(test.Duty)
-	for _, msg := range test.Messages {
-		err := v.ProcessMessage(msg)
-		if err != nil {
-			lastErr = err
-		}
-	}
-
-	if len(test.ExpectedError) != 0 {
-		require.EqualError(t, lastErr, test.ExpectedError)
-	} else {
-		require.NoError(t, lastErr)
-	}
-
-	postRoot, err := test.Runner.State.GetRoot()
-	require.NoError(t, err)
-
-	require.EqualValues(t, test.PostDutyRunnerStateRoot, hex.EncodeToString(postRoot))
 }
 
 func fixQBFTInstanceForRun(t *testing.T, i *qbft.Instance, ks *testingutils.TestKeySet) *qbft.Instance {
@@ -119,4 +98,19 @@ func keySetForShare(share *types.Share) *testingutils.TestKeySet {
 		return testingutils.Testing13SharesSet()
 	}
 	return testingutils.Testing4SharesSet()
+}
+
+func setControllerInRunner(runner ssv.Runner, controller *qbft.Controller) {
+	switch runner.GetBeaconRole() {
+	case types.BNRoleAttester:
+		runner.(*ssv.AttesterRunner).QBFTController = controller
+	case types.BNRoleAggregator:
+		runner.(*ssv.AggregatorRunner).QBFTController = controller
+	case types.BNRoleProposer:
+		runner.(*ssv.ProposerRunner).QBFTController = controller
+	case types.BNRoleSyncCommittee:
+		runner.(*ssv.SyncCommitteeRunner).QBFTController = controller
+	case types.BNRoleSyncCommitteeContribution:
+		runner.(*ssv.SyncCommitteeAggregatorRunner).QBFTController = controller
+	}
 }
