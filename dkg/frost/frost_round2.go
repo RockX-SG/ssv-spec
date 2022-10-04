@@ -8,6 +8,9 @@ import (
 )
 
 func (fr *FROST) processRound2() error {
+	if fr.isResharing() && !fr.inNewCommittee() {
+		return nil
+	}
 
 	bcast := make(map[uint32]*frost.Round1Bcast)
 	p2psend := make(map[uint32]*sharing.ShamirShare)
