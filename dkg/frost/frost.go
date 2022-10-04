@@ -26,19 +26,24 @@ type FROST struct {
 	threshold    uint32
 	currentRound DKGRound
 
-	operatorID  types.OperatorID
-	operators   []uint32
-	participant *frost.DkgParticipant
-	sessionSK   *ecies.PrivateKey
+	operatorID   types.OperatorID
+	operators    []uint32
+	operatorsOld []uint32
+	participant  *frost.DkgParticipant
+	sessionSK    *ecies.PrivateKey
 
-	msgs           map[DKGRound]map[uint32]*dkg.SignedMessage
-	operatorShares map[uint32]*bls.SecretKey
+	msgs map[DKGRound]map[uint32]*dkg.SignedMessage
+
+	oldKeyGenOutput *dkg.KeyGenOutput
+	operatorShares  map[uint32]*bls.SecretKey
 }
 
 type DKGRound int
 
 const (
-	Preparation DKGRound = iota + 1
+	Uninitialized DKGRound = iota
+	Join                   // Used for old committee to join, otherwise the protocol can't proceed
+	Preparation
 	Round1
 	Round2
 	Blame
@@ -59,18 +64,50 @@ func New(
 	msgs[Blame] = make(map[uint32]*dkg.SignedMessage)
 
 	return &FROST{
-		identifier: requestID,
-		network:    network,
-		signer:     signer,
-		storage:    storage,
-		operatorID: operatorID,
+		identifier:   requestID,
+		network:      network,
+		signer:       signer,
+		storage:      storage,
+		operatorID:   operatorID,
+		currentRound: Uninitialized,
 
 		msgs:           msgs,
 		operatorShares: make(map[uint32]*bls.SecretKey),
 	}
 }
 
+func NewResharing(
+	network dkg.Network,
+	operatorID types.OperatorID,
+	requestID dkg.RequestID,
+	signer types.DKGSigner,
+	storage dkg.Storage,
+	oldKeyGenOutput dkg.KeyGenOutput,
+) dkg.KeyGenProtocol {
+
+	msgs := make(map[DKGRound]map[uint32]*dkg.SignedMessage)
+	msgs[Preparation] = make(map[uint32]*dkg.SignedMessage)
+	msgs[Round1] = make(map[uint32]*dkg.SignedMessage)
+	msgs[Round2] = make(map[uint32]*dkg.SignedMessage)
+	msgs[Blame] = make(map[uint32]*dkg.SignedMessage)
+
+	return &FROST{
+		identifier: requestID,
+		network:    network,
+		signer:     signer,
+		storage:    storage,
+		operatorID: operatorID,
+
+		msgs:            msgs,
+		operatorShares:  make(map[uint32]*bls.SecretKey),
+		oldKeyGenOutput: &oldKeyGenOutput,
+	}
+}
+
 func (fr *FROST) Start(init *dkg.Init) error {
+
+	// TODO: Move Init/Reshare to New instead of in Start
+	// TODO: If Reshare, check threshold
 
 	otherOperators := make([]uint32, 0)
 	for _, operatorID := range init.OperatorIDs {
@@ -103,6 +140,7 @@ func (fr *FROST) Start(init *dkg.Init) error {
 	}
 	fr.sessionSK = k
 
+	// TODO: If resharing, go to Join state instead of Preparation state
 	fr.currentRound = Preparation
 	msg := &ProtocolMsg{
 		Round: Preparation,
@@ -141,6 +179,7 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, er
 
 	switch protocolMessage.Round {
 	case Preparation:
+		// Received all
 		if fr.canProceedThisRound(Round1) {
 			if err := fr.processRound1(); err != nil {
 				return false, nil, err
@@ -173,29 +212,72 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, er
 	return false, nil, nil
 }
 
-func (fr *FROST) canProceedThisRound(thisRound DKGRound) bool {
+func (fr *FROST) canProceedThisRound(round DKGRound) bool {
 
-	if thisRound == Preparation {
-		return true
+	// Join (O) -> Preparation (N) -> Round1 (N) -> Round2 (O)
+	switch fr.currentRound {
+	case Join:
+		return fr.allMessagesReceivedFor(Join, fr.operatorsOld)
+	case Preparation:
+		return fr.allMessagesReceivedFor(Preparation, fr.operators)
+	case Round1:
+		return fr.allMessagesReceivedFor(Round1, fr.operators)
+	case Round2:
+		if fr.isResharing() {
+			fr.allMessagesReceivedFor(Round2, fr.operatorsOld)
+		} else {
+			fr.allMessagesReceivedFor(Round2, fr.operators)
+		}
 	}
+	return true
+}
 
-	prevRound := thisRound - 1
-	if thisRound < Preparation {
-		prevRound = Round2
-	}
-
-	if fr.currentRound != prevRound {
-		return false
-	}
-
-	// received msgs from all operators for last round
-	for _, operatorID := range fr.operators {
-		if _, ok := fr.msgs[prevRound][operatorID]; !ok {
+func (fr *FROST) allMessagesReceivedFor(round DKGRound, operators []uint32) bool {
+	for _, operatorID := range operators {
+		if _, ok := fr.msgs[round][operatorID]; !ok {
 			return false
 		}
 	}
-
 	return true
+}
+
+func (fr *FROST) isResharing() bool {
+	return len(fr.operatorsOld) > 0
+}
+
+func (fr *FROST) inOldCommittee() bool {
+	for _, id := range fr.operatorsOld {
+		if types.OperatorID(id) == fr.operatorID {
+			return true
+		}
+	}
+	return false
+}
+
+func (fr *FROST) inNewCommittee() bool {
+	for _, id := range fr.operators {
+		if types.OperatorID(id) == fr.operatorID {
+			return true
+		}
+	}
+	return false
+}
+
+func (fr *FROST) needToRunThisRound(thisRound DKGRound) bool {
+	// If new keygen, every round need to run
+	if !fr.isResharing() {
+		return true
+	}
+	switch thisRound {
+	case Preparation:
+		return fr.inNewCommittee()
+	case Round1:
+		return fr.inOldCommittee()
+	case Round2:
+		return fr.inNewCommittee()
+	default:
+		return false
+	}
 }
 
 func (fr *FROST) encryptByOperatorID(operatorID uint32, data []byte) ([]byte, error) {

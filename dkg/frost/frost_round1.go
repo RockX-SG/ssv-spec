@@ -3,6 +3,9 @@ package frost
 import "github.com/herumi/bls-eth-go-binary/bls"
 
 func (fr *FROST) processRound1() error {
+	if fr.isResharing() && fr.inNewCommittee() {
+		return nil
+	}
 
 	bCastMessage, p2pMessages, err := fr.participant.Round1(nil)
 	if err != nil {
@@ -46,4 +49,13 @@ func (fr *FROST) processRound1() error {
 		},
 	}
 	return fr.broadcastDKGMessage(msg)
+}
+
+func (fr *FROST) partialInterpolate() []byte {
+	if !fr.isResharing() {
+		return nil
+	}
+
+	sk_i := new(bls.SecretKey)
+	bls.FrLagrangeInterpolation(sk_i)
 }
