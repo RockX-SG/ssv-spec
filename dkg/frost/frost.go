@@ -19,19 +19,23 @@ func init() {
 }
 
 type FROST struct {
-	identifier   dkg.RequestID
-	network      dkg.Network
-	signer       types.DKGSigner
-	storage      dkg.Storage
-	threshold    uint32
-	currentRound DKGRound
+	network    dkg.Network
+	identifier dkg.RequestID
+	operatorID types.OperatorID
+	signer     types.DKGSigner
+	storage    dkg.Storage
 
-	operatorID  types.OperatorID
-	operators   []uint32
-	participant *frost.DkgParticipant
+	state State
+}
+
+type State struct {
+	threshold   uint32
 	sessionSK   *ecies.PrivateKey
+	participant *frost.DkgParticipant
 
+	currentRound   DKGRound
 	msgs           map[DKGRound]map[uint32]*dkg.SignedMessage
+	operators      []uint32
 	operatorShares map[uint32]*bls.SecretKey
 }
 
@@ -65,8 +69,10 @@ func New(
 		storage:    storage,
 		operatorID: operatorID,
 
-		msgs:           msgs,
-		operatorShares: make(map[uint32]*bls.SecretKey),
+		state: State{
+			msgs:           msgs,
+			operatorShares: make(map[uint32]*bls.SecretKey),
+		},
 	}
 }
 
@@ -82,7 +88,7 @@ func (fr *FROST) Start(init *dkg.Init) error {
 
 	operators := []uint32{uint32(fr.operatorID)}
 	operators = append(operators, otherOperators...)
-	fr.operators = operators
+	fr.state.operators = operators
 
 	ctx := make([]byte, 16)
 	if _, err := rand.Read(ctx); err != nil {
@@ -94,16 +100,16 @@ func (fr *FROST) Start(init *dkg.Init) error {
 		return errors.Wrap(err, "failed to initialize a dkg participant")
 	}
 
-	fr.participant = participant
-	fr.threshold = uint32(init.Threshold)
+	fr.state.participant = participant
+	fr.state.threshold = uint32(init.Threshold)
 
 	k, err := ecies.GenerateKey()
 	if err != nil {
 		return errors.Wrap(err, "failed to generate session sk")
 	}
-	fr.sessionSK = k
+	fr.state.sessionSK = k
 
-	fr.currentRound = Preparation
+	fr.state.currentRound = Preparation
 	msg := &ProtocolMsg{
 		Round: Preparation,
 		PreparationMessage: &PreparationMessage{
@@ -128,16 +134,16 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, er
 		return false, nil, errors.New("failed to validate protocol message")
 	}
 
-	if fr.msgs[protocolMessage.Round] == nil {
-		fr.msgs[protocolMessage.Round] = make(map[uint32]*dkg.SignedMessage)
+	if fr.state.msgs[protocolMessage.Round] == nil {
+		fr.state.msgs[protocolMessage.Round] = make(map[uint32]*dkg.SignedMessage)
 	}
 
-	originalMessage, ok := fr.msgs[protocolMessage.Round][uint32(msg.Signer)]
+	originalMessage, ok := fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)]
 	if ok {
 		return false, nil, fr.createBlameTypeInconsistentMessageRequest(originalMessage, msg)
 	}
 
-	fr.msgs[protocolMessage.Round][uint32(msg.Signer)] = msg
+	fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)] = msg
 
 	switch protocolMessage.Round {
 	case Preparation:
@@ -184,13 +190,13 @@ func (fr *FROST) canProceedThisRound(thisRound DKGRound) bool {
 		prevRound = Round2
 	}
 
-	if fr.currentRound != prevRound {
+	if fr.state.currentRound != prevRound {
 		return false
 	}
 
 	// received msgs from all operators for last round
-	for _, operatorID := range fr.operators {
-		if _, ok := fr.msgs[prevRound][operatorID]; !ok {
+	for _, operatorID := range fr.state.operators {
+		if _, ok := fr.state.msgs[prevRound][operatorID]; !ok {
 			return false
 		}
 	}
@@ -200,7 +206,7 @@ func (fr *FROST) canProceedThisRound(thisRound DKGRound) bool {
 
 func (fr *FROST) encryptByOperatorID(operatorID uint32, data []byte) ([]byte, error) {
 
-	msg, ok := fr.msgs[Preparation][operatorID]
+	msg, ok := fr.state.msgs[Preparation][operatorID]
 	if !ok {
 		return nil, errors.New("no session pk found for the operator")
 	}
@@ -257,6 +263,6 @@ func (fr *FROST) broadcastDKGMessage(msg *ProtocolMsg) error {
 		return err
 	}
 
-	fr.msgs[fr.currentRound][uint32(fr.operatorID)] = bcastMessage
+	fr.state.msgs[fr.state.currentRound][uint32(fr.operatorID)] = bcastMessage
 	return fr.network.BroadcastDKGMessage(bcastMessage)
 }
