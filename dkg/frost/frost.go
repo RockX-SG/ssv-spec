@@ -42,7 +42,6 @@ type DKGRound int
 
 const (
 	Uninitialized DKGRound = iota
-	Join                   // Used for old committee to join, otherwise the protocol can't proceed
 	Preparation
 	Round1
 	Round2
@@ -104,10 +103,8 @@ func NewResharing(
 	}
 }
 
+// TODO: If Reshare, confirm participating operators using qbft before kick-starting this process.
 func (fr *FROST) Start(init *dkg.Init) error {
-
-	// TODO: Move Init/Reshare to New instead of in Start
-	// TODO: If Reshare, check threshold
 
 	otherOperators := make([]uint32, 0)
 	for _, operatorID := range init.OperatorIDs {
@@ -140,15 +137,17 @@ func (fr *FROST) Start(init *dkg.Init) error {
 	}
 	fr.sessionSK = k
 
-	// TODO: If resharing, go to Join state instead of Preparation state
 	fr.currentRound = Preparation
-	msg := &ProtocolMsg{
-		Round: Preparation,
-		PreparationMessage: &PreparationMessage{
-			SessionPk: k.PublicKey.Bytes(true),
-		},
+	if !fr.isResharing() || fr.inNewCommittee() {
+		msg := &ProtocolMsg{
+			Round: Preparation,
+			PreparationMessage: &PreparationMessage{
+				SessionPk: k.PublicKey.Bytes(true),
+			},
+		}
+		return fr.broadcastDKGMessage(msg)
 	}
-	return fr.broadcastDKGMessage(msg)
+	return nil
 }
 
 func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, error) {
@@ -214,20 +213,18 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, er
 
 func (fr *FROST) canProceedThisRound(round DKGRound) bool {
 
-	// Join (O) -> Preparation (N) -> Round1 (N) -> Round2 (O)
+	// Preparation (N) -> Round1 (O) -> Round2 (N)
 	switch fr.currentRound {
-	case Join:
-		return fr.allMessagesReceivedFor(Join, fr.operatorsOld)
 	case Preparation:
 		return fr.allMessagesReceivedFor(Preparation, fr.operators)
 	case Round1:
-		return fr.allMessagesReceivedFor(Round1, fr.operators)
-	case Round2:
 		if fr.isResharing() {
-			fr.allMessagesReceivedFor(Round2, fr.operatorsOld)
+			return fr.allMessagesReceivedFor(Round1, fr.operatorsOld)
 		} else {
-			fr.allMessagesReceivedFor(Round2, fr.operators)
+			return fr.allMessagesReceivedFor(Round1, fr.operators)
 		}
+	case Round2:
+		return fr.allMessagesReceivedFor(Round2, fr.operators)
 	}
 	return true
 }

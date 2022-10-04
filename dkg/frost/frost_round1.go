@@ -1,13 +1,17 @@
 package frost
 
-import "github.com/herumi/bls-eth-go-binary/bls"
+import (
+	"github.com/bloxapp/ssv-spec/types"
+	"github.com/herumi/bls-eth-go-binary/bls"
+)
 
 func (fr *FROST) processRound1() error {
 	if fr.isResharing() && fr.inNewCommittee() {
 		return nil
 	}
+	skI := fr.partialInterpolate()
 
-	bCastMessage, p2pMessages, err := fr.participant.Round1(nil)
+	bCastMessage, p2pMessages, err := fr.participant.Round1(skI)
 	if err != nil {
 		return err
 	}
@@ -56,6 +60,17 @@ func (fr *FROST) partialInterpolate() []byte {
 		return nil
 	}
 
-	sk_i := new(bls.SecretKey)
-	bls.FrLagrangeInterpolation(sk_i)
+	skI := new(bls.Fr)
+	indices := make([]bls.Fr, fr.oldKeyGenOutput.Threshold+1)
+	values := make([]bls.Fr, fr.oldKeyGenOutput.Threshold+1)
+	for i, id := range fr.operatorsOld {
+		(&indices[i]).SetInt64(int64(id))
+		if types.OperatorID(id) == fr.operatorID {
+			(&values[i]).Deserialize(fr.oldKeyGenOutput.Share.Serialize())
+		} else {
+			(&values[i]).SetInt64(0)
+		}
+	}
+	bls.FrLagrangeInterpolation(skI, indices, values)
+	return skI.Serialize()
 }
