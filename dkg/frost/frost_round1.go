@@ -6,7 +6,7 @@ import (
 )
 
 func (fr *FROST) processRound1() error {
-	if fr.isResharing() && !fr.inOldCommittee() {
+	if !fr.needToRunThisRound(Round1) {
 		return nil
 	}
 	skI := fr.partialInterpolate()

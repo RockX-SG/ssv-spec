@@ -8,7 +8,7 @@ import (
 )
 
 func (fr *FROST) processRound2() error {
-	if fr.isResharing() && !fr.inNewCommittee() {
+	if !fr.needToRunThisRound(Round2) {
 		return nil
 	}
 

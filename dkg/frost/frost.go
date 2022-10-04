@@ -131,14 +131,13 @@ func (fr *FROST) Start(init *dkg.Init) error {
 	fr.participant = participant
 	fr.threshold = uint32(init.Threshold)
 
-	k, err := ecies.GenerateKey()
-	if err != nil {
-		return errors.Wrap(err, "failed to generate session sk")
-	}
-	fr.sessionSK = k
-
 	fr.currentRound = Preparation
-	if !fr.isResharing() || fr.inNewCommittee() {
+	if fr.needToRunThisRound(Preparation) {
+		k, err := ecies.GenerateKey()
+		if err != nil {
+			return errors.Wrap(err, "failed to generate session sk")
+		}
+		fr.sessionSK = k
 		msg := &ProtocolMsg{
 			Round: Preparation,
 			PreparationMessage: &PreparationMessage{
