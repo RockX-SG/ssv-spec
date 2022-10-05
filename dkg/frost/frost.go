@@ -145,7 +145,7 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 
 	fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)] = msg
 
-	switch protocolMessage.Round {
+	switch fr.state.currentRound {
 	case Preparation:
 		if fr.canProceedThisRound(Round1) {
 			if err := fr.processRound1(); err != nil {
