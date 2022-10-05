@@ -157,5 +157,5 @@ func (fr *FROST) createBlameTypeInvalidShareRequest(operatorID uint32) error {
 }
 
 func (fr *FROST) IsInconsistentMessage(originalMessage, newMessage *dkg.SignedMessage) bool {
-	return sha256.Sum256(originalMessage.Message.Data) == sha256.Sum256(newMessage.Message.Data)
+	return sha256.Sum256(originalMessage.Message.Data) != sha256.Sum256(newMessage.Message.Data)
 }
