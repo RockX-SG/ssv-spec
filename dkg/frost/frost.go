@@ -8,6 +8,8 @@ import (
 	"github.com/coinbase/kryptology/pkg/core/curves"
 	"github.com/coinbase/kryptology/pkg/dkg/frost"
 	ecies "github.com/ecies/go/v2"
+	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/pkg/errors"
 )
@@ -121,21 +123,16 @@ func (fr *FROST) Start(init *dkg.Init) error {
 
 func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, error) {
 
-	if err := msg.Validate(); err != nil {
-		return false, nil, errors.Wrap(err, "failed to validate message signature")
+	if err := fr.validateSignedMessage(msg); err != nil {
+		return false, nil, errors.Wrap(err, "failed to validate signed message")
 	}
 
 	protocolMessage := &ProtocolMsg{}
 	if err := protocolMessage.Decode(msg.Message.Data); err != nil {
 		return false, nil, errors.Wrap(err, "failed to decode protocol msg")
 	}
-
-	if valid := protocolMessage.validate(); !valid {
+	if err := fr.validateProtocolMessage(protocolMessage); err != nil {
 		return false, nil, errors.New("failed to validate protocol message")
-	}
-
-	if fr.state.msgs[protocolMessage.Round] == nil {
-		fr.state.msgs[protocolMessage.Round] = make(map[uint32]*dkg.SignedMessage)
 	}
 
 	originalMessage, ok := fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)]
@@ -202,6 +199,47 @@ func (fr *FROST) canProceedThisRound(thisRound DKGRound) bool {
 	}
 
 	return true
+}
+
+func (fr *FROST) validateSignedMessage(msg *dkg.SignedMessage) error {
+	if msg.Message.Identifier != fr.state.identifier {
+		return errors.New("got mismatching identifier")
+	}
+
+	found, operator, err := fr.storage.GetDKGOperator(msg.Signer)
+	if !found {
+		return errors.New("unable to find signer")
+	}
+	if err != nil {
+		return errors.Wrap(err, "unable to find signer")
+	}
+
+	root, err := msg.Message.GetRoot()
+	if err != nil {
+		return errors.Wrap(err, "failed to get root")
+	}
+
+	pk, err := crypto.Ecrecover(root, msg.Signature)
+	if err != nil {
+		return errors.Wrap(err, "unable to recover public key")
+	}
+
+	addr := common.BytesToAddress(crypto.Keccak256(pk[1:])[12:])
+	if addr != operator.ETHAddress {
+		return errors.New("invalid signature")
+	}
+	return nil
+}
+
+func (fr *FROST) validateProtocolMessage(msg *ProtocolMsg) error {
+	if msg.Round != fr.state.currentRound {
+		return dkg.ErrMismatchRound{}
+	}
+
+	if valid := msg.validate(); !valid {
+		return errors.New("invalid message")
+	}
+	return nil
 }
 
 func (fr *FROST) encryptByOperatorID(operatorID uint32, data []byte) ([]byte, error) {
