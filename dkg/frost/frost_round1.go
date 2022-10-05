@@ -9,7 +9,10 @@ func (fr *FROST) processRound1() error {
 	if !fr.needToRunThisRound(Round1) {
 		return nil
 	}
-	skI := fr.partialInterpolate()
+	skI, err := fr.partialInterpolate()
+	if err != nil {
+		return err
+	}
 
 	bCastMessage, p2pMessages, err := fr.participant.Round1(skI)
 	if err != nil {
@@ -55,9 +58,9 @@ func (fr *FROST) processRound1() error {
 	return fr.broadcastDKGMessage(msg)
 }
 
-func (fr *FROST) partialInterpolate() []byte {
+func (fr *FROST) partialInterpolate() ([]byte, error) {
 	if !fr.isResharing() {
-		return nil
+		return nil, nil
 	}
 
 	skI := new(bls.Fr)
@@ -71,6 +74,9 @@ func (fr *FROST) partialInterpolate() []byte {
 			(&values[i]).SetInt64(0)
 		}
 	}
-	bls.FrLagrangeInterpolation(skI, indices, values)
-	return skI.Serialize()
+	err := bls.FrLagrangeInterpolation(skI, indices, values)
+	if err != nil {
+		return nil, err
+	}
+	return skI.Serialize(), nil
 }
