@@ -121,8 +121,14 @@ func (fr *FROST) Start(init *dkg.Init) error {
 
 func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, error) {
 
+	// validate signature
 	if err := msg.Validate(); err != nil {
 		return false, nil, errors.Wrap(err, "failed to validate message signature")
+	}
+
+	// validate identifier
+	if msg.Message.Identifier != fr.state.identifier {
+		return false, nil, errors.New("invalid identifier for dkg")
 	}
 
 	protocolMessage := &ProtocolMsg{}
@@ -130,7 +136,7 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 		return false, nil, errors.Wrap(err, "failed to decode protocol msg")
 	}
 
-	if valid := protocolMessage.validate(); !valid {
+	if valid := protocolMessage.validate(fr.state.currentRound); !valid {
 		return false, nil, errors.New("failed to validate protocol message")
 	}
 
