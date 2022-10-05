@@ -66,7 +66,7 @@ func TestFrostDKG(t *testing.T) {
 	}
 
 	threshold := 2
-	outputs := make(map[uint32]*dkg.KeyGenOutput)
+	outputs := make(map[uint32]*dkg.KeyGenOutcome)
 
 	// preparation round
 	initMsg := &dkg.Init{
@@ -115,9 +115,9 @@ func TestFrostDKG(t *testing.T) {
 	for _, operatorID := range operators {
 		output := outputs[uint32(operatorID)]
 
-		require.Equal(t, expected.ValidatorPK, hex.EncodeToString(output.ValidatorPK))
-		require.Equal(t, expected.Share[uint32(operatorID)], output.Share.SerializeToHexStr())
-		for opID, publicKey := range output.OperatorPubKeys {
+		require.Equal(t, expected.ValidatorPK, hex.EncodeToString(output.KeyGenOutput.ValidatorPK))
+		require.Equal(t, expected.Share[uint32(operatorID)], output.KeyGenOutput.Share.SerializeToHexStr())
+		for opID, publicKey := range output.KeyGenOutput.OperatorPubKeys {
 			require.Equal(t, expected.OperatorPubKeys[uint32(opID)], publicKey.SerializeToHexStr())
 		}
 	}

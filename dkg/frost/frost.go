@@ -119,7 +119,7 @@ func (fr *FROST) Start(init *dkg.Init) error {
 	return fr.broadcastDKGMessage(msg)
 }
 
-func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, error) {
+func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, error) {
 
 	if err := msg.Validate(); err != nil {
 		return false, nil, errors.Wrap(err, "failed to validate message signature")
@@ -164,14 +164,14 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, er
 			if err != nil {
 				return false, nil, err
 			}
-			return true, out, nil
+			return true, &dkg.KeyGenOutcome{KeyGenOutput: out}, nil
 		}
 	case Blame:
 		out, err := fr.processBlame()
 		if err != nil {
 			return false, nil, err
 		}
-		return true, &dkg.KeyGenOutput{BlameOutout: out}, err
+		return true, &dkg.KeyGenOutcome{BlameOutput: out}, err
 	default:
 		return true, nil, dkg.ErrInvalidRound{}
 	}
