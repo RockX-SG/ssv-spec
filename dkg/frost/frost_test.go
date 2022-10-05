@@ -132,7 +132,7 @@ func getRandRequestID() dkg.RequestID {
 	return requestID
 }
 
-func getSignedMessage(requestID dkg.RequestID, operatorID types.OperatorID) *dkg.SignedMessage {
+func getSignedMessage(requestID dkg.RequestID, operatorID types.OperatorID, data []byte) *dkg.SignedMessage {
 	storage := testingutils.NewTestingStorage()
 	signer := testingutils.NewTestingKeyManager()
 
@@ -140,7 +140,7 @@ func getSignedMessage(requestID dkg.RequestID, operatorID types.OperatorID) *dkg
 		Message: &dkg.Message{
 			MsgType:    dkg.ProtocolMsgType,
 			Identifier: requestID,
-			Data:       []byte{1, 1, 1, 1, 1},
+			Data:       data,
 		},
 		Signer:    operatorID,
 		Signature: nil,
@@ -155,15 +155,14 @@ func getSignedMessage(requestID dkg.RequestID, operatorID types.OperatorID) *dkg
 func TestProcessBlameTypeInconsistentMessage(t *testing.T) {
 	reqID := getRandRequestID()
 
-	data := getSignedMessage(reqID, 1)
+	data := getSignedMessage(reqID, 1, []byte{1, 1, 1, 1})
 	dataBytes, _ := data.Encode()
 
-	validData := getSignedMessage(reqID, 1)
+	validData := getSignedMessage(reqID, 1, []byte{1, 1, 1, 1})
 	validDataBytes, _ := validData.Encode()
 
-	// tamperedData := getSignedMessage(reqID, 1)
-	// tamperedData.Message.Data = []byte{2, 2, 2, 2, 2}
-	// tamperedDataBytes, _ := tamperedData.Encode()
+	tamperedData := getSignedMessage(reqID, 1, []byte{2, 2, 2, 2})
+	tamperedDataBytes, _ := tamperedData.Encode()
 
 	tests := map[string]struct {
 		blameMessage *BlameMessage
@@ -176,17 +175,13 @@ func TestProcessBlameTypeInconsistentMessage(t *testing.T) {
 			},
 			expected: true,
 		},
-		/*
-			TODO: Uncomment this section once signed message's validate
-			function is implemented
-		*/
-		// "blame_req_is_invalid": {
-		// 	blameMessage: &BlameMessage{
-		// 		Type:      InconsistentMessage,
-		// 		BlameData: [][]byte{dataBytes, tamperedDataBytes},
-		// 	},
-		// 	expected: false,
-		// },
+		"blame_req_is_invalid": {
+			blameMessage: &BlameMessage{
+				Type:      InconsistentMessage,
+				BlameData: [][]byte{dataBytes, tamperedDataBytes},
+			},
+			expected: false,
+		},
 	}
 
 	for name, test := range tests {

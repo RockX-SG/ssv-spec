@@ -139,7 +139,7 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, er
 	}
 
 	originalMessage, ok := fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)]
-	if ok {
+	if ok && fr.IsInconsistentMessage(originalMessage, msg) {
 		return false, nil, fr.createBlameTypeInconsistentMessageRequest(originalMessage, msg)
 	}
 
