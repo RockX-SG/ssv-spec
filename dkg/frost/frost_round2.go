@@ -38,17 +38,17 @@ func (fr *FROST) processRound2() error {
 		}
 		bcast[operatorID] = bcastMessage
 
-		if uint32(fr.operatorID) == operatorID {
+		if uint32(fr.state.operatorID) == operatorID {
 			continue
 		}
 
-		shareBytes, err := ecies.Decrypt(fr.state.sessionSK, protocolMessage.Round1Message.Shares[uint32(fr.operatorID)])
+		shareBytes, err := ecies.Decrypt(fr.state.sessionSK, protocolMessage.Round1Message.Shares[uint32(fr.state.operatorID)])
 		if err != nil {
 			return err
 		}
 
 		share := &sharing.ShamirShare{
-			Id:    uint32(fr.operatorID),
+			Id:    uint32(fr.state.operatorID),
 			Value: shareBytes,
 		}
 

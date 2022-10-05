@@ -23,7 +23,7 @@ func (fr *FROST) processKeygenOutput() (*dkg.KeyGenOutput, error) {
 			return nil, errors.Wrap(err, "failed to decode protocol msg")
 		}
 
-		if operatorID == uint32(fr.operatorID) {
+		if operatorID == uint32(fr.state.operatorID) {
 			sk := &bls.SecretKey{}
 			if err := sk.Deserialize(fr.state.participant.SkShare.Bytes()); err != nil {
 				return nil, err

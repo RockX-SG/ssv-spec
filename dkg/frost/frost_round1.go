@@ -16,7 +16,7 @@ func (fr *FROST) processRound1() error {
 
 	shares := make(map[uint32][]byte)
 	for _, operatorID := range fr.state.operators {
-		if uint32(fr.operatorID) == operatorID {
+		if uint32(fr.state.operatorID) == operatorID {
 			continue
 		}
 

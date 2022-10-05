@@ -19,16 +19,16 @@ func init() {
 }
 
 type FROST struct {
-	network    dkg.Network
-	identifier dkg.RequestID
-	operatorID types.OperatorID
-	signer     types.DKGSigner
-	storage    dkg.Storage
+	network dkg.Network
+	signer  types.DKGSigner
+	storage dkg.Storage
 
-	state State
+	state *State
 }
 
 type State struct {
+	identifier  dkg.RequestID
+	operatorID  types.OperatorID
 	threshold   uint32
 	sessionSK   *ecies.PrivateKey
 	participant *frost.DkgParticipant
@@ -63,13 +63,13 @@ func New(
 	msgs[Blame] = make(map[uint32]*dkg.SignedMessage)
 
 	return &FROST{
-		identifier: requestID,
-		network:    network,
-		signer:     signer,
-		storage:    storage,
-		operatorID: operatorID,
+		network: network,
+		signer:  signer,
+		storage: storage,
 
-		state: State{
+		state: &State{
+			identifier:     requestID,
+			operatorID:     operatorID,
 			msgs:           msgs,
 			operatorShares: make(map[uint32]*bls.SecretKey),
 		},
@@ -80,13 +80,13 @@ func (fr *FROST) Start(init *dkg.Init) error {
 
 	otherOperators := make([]uint32, 0)
 	for _, operatorID := range init.OperatorIDs {
-		if fr.operatorID == operatorID {
+		if fr.state.operatorID == operatorID {
 			continue
 		}
 		otherOperators = append(otherOperators, uint32(operatorID))
 	}
 
-	operators := []uint32{uint32(fr.operatorID)}
+	operators := []uint32{uint32(fr.state.operatorID)}
 	operators = append(operators, otherOperators...)
 	fr.state.operators = operators
 
@@ -95,7 +95,7 @@ func (fr *FROST) Start(init *dkg.Init) error {
 		return err
 	}
 
-	participant, err := frost.NewDkgParticipant(uint32(fr.operatorID), uint32(len(operators)), string(ctx), thisCurve, otherOperators...)
+	participant, err := frost.NewDkgParticipant(uint32(fr.state.operatorID), uint32(len(operators)), string(ctx), thisCurve, otherOperators...)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize a dkg participant")
 	}
@@ -234,18 +234,18 @@ func (fr *FROST) toSignedMessage(msg *ProtocolMsg) (*dkg.SignedMessage, error) {
 	bcastMessage := &dkg.SignedMessage{
 		Message: &dkg.Message{
 			MsgType:    dkg.ProtocolMsgType,
-			Identifier: fr.identifier,
+			Identifier: fr.state.identifier,
 			Data:       msgBytes,
 		},
-		Signer: fr.operatorID,
+		Signer: fr.state.operatorID,
 	}
 
-	exist, operator, err := fr.storage.GetDKGOperator(fr.operatorID)
+	exist, operator, err := fr.storage.GetDKGOperator(fr.state.operatorID)
 	if err != nil {
 		return nil, err
 	}
 	if !exist {
-		return nil, errors.Errorf("operator with id %d not found", fr.operatorID)
+		return nil, errors.Errorf("operator with id %d not found", fr.state.operatorID)
 	}
 
 	sig, err := fr.signer.SignDKGOutput(bcastMessage, operator.ETHAddress)
@@ -263,6 +263,6 @@ func (fr *FROST) broadcastDKGMessage(msg *ProtocolMsg) error {
 		return err
 	}
 
-	fr.state.msgs[fr.state.currentRound][uint32(fr.operatorID)] = bcastMessage
+	fr.state.msgs[fr.state.currentRound][uint32(fr.state.operatorID)] = bcastMessage
 	return fr.network.BroadcastDKGMessage(bcastMessage)
 }
