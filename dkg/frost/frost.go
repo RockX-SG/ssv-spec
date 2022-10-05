@@ -136,7 +136,7 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, er
 	}
 
 	originalMessage, ok := fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)]
-	if ok && fr.IsInconsistentMessage(originalMessage, msg) {
+	if ok && !fr.compareDataHash(originalMessage, msg) {
 		return false, nil, fr.createBlameTypeInconsistentMessageRequest(originalMessage, msg)
 	}
 
