@@ -3,7 +3,6 @@ package frost
 import (
 	crand "crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"math/big"
 	mrand "math/rand"
@@ -12,116 +11,10 @@ import (
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
-	"github.com/coinbase/kryptology/pkg/sharing"
-	ecies "github.com/ecies/go/v2"
 	"github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
-
-type dkgTestOutput struct {
-	Share           map[uint32]string
-	ValidatorPK     string
-	OperatorPubKeys map[uint32]string
-	Threshold       uint64
-}
-
-func (dkgoutput dkgTestOutput) toKeyGenOutputMap() map[uint32]*dkg.KeyGenOutput {
-	ret := make(map[uint32]*dkg.KeyGenOutput)
-
-	opPublicKeys := make(map[types.OperatorID]*bls.PublicKey)
-	for opID, publicKey := range dkgoutput.OperatorPubKeys {
-		pk := &bls.PublicKey{}
-		_ = pk.DeserializeHexStr(publicKey)
-
-		opPublicKeys[types.OperatorID(opID)] = pk
-
-		share := dkgoutput.Share[opID]
-
-		sk := &bls.SecretKey{}
-		_ = sk.DeserializeHexStr(share)
-
-		vk, _ := hex.DecodeString(dkgoutput.ValidatorPK)
-
-		ret[opID] = &dkg.KeyGenOutput{
-			Share:           sk,
-			ValidatorPK:     vk,
-			OperatorPubKeys: opPublicKeys,
-			Threshold:       dkgoutput.Threshold,
-		}
-	}
-
-	return ret
-}
-
-func resetRandSeed() {
-	src := mrand.NewSource(1)
-	src.Seed(12345)
-	crand.Reader = mrand.New(src)
-}
-
-func doFrostDKG(operators []types.OperatorID) (map[uint32]*dkg.KeyGenOutcome, error) {
-	resetRandSeed()
-
-	requestID := getRandRequestID()
-
-	dkgsigner := testingutils.NewTestingKeyManager()
-	storage := testingutils.NewTestingStorage()
-	network := testingutils.NewTestingNetwork()
-
-	kgps := make(map[types.OperatorID]dkg.KeyGenProtocol)
-	for _, operatorID := range operators {
-		p := New(network, operatorID, requestID, dkgsigner, storage)
-		kgps[operatorID] = p
-	}
-
-	threshold := 2
-	outputs := make(map[uint32]*dkg.KeyGenOutcome)
-
-	// preparation round
-	initMsg := &dkg.Init{
-		OperatorIDs: operators,
-		Threshold:   uint16(threshold),
-	}
-
-	for _, operatorID := range operators {
-		if err := kgps[operatorID].Start(initMsg); err != nil {
-			return nil, errors.Wrapf(err, "failed to start dkg protocol for operator %d", operatorID)
-		}
-	}
-
-	rounds := []string{"round 1", "round 2", "keygen output"}
-
-	for _, round := range rounds {
-		fmt.Printf("proceeding with %s\n", round)
-
-		messages := network.BroadcastedMsgs
-		network.BroadcastedMsgs = make([]*types.SSVMessage, 0)
-
-		for _, msg := range messages {
-			dkgMsg := &dkg.SignedMessage{}
-			if err := dkgMsg.Decode(msg.Data); err != nil {
-				return nil, err
-			}
-
-			for _, operatorID := range operators {
-				if operatorID == dkgMsg.Signer {
-					continue
-				}
-
-				finished, output, err := kgps[operatorID].ProcessMsg(dkgMsg)
-				if err != nil {
-					return nil, err
-				}
-
-				if finished {
-					outputs[uint32(operatorID)] = output
-				}
-			}
-		}
-	}
-	return outputs, nil
-}
 
 var (
 	expectedFrostOutput = dkgTestOutput{
@@ -143,6 +36,8 @@ var (
 )
 
 func TestFrostDKG(t *testing.T) {
+
+	resetRandSeed()
 
 	operators := []types.OperatorID{
 		1, 2, 3, 4,
@@ -273,6 +168,109 @@ func TestResharing(t *testing.T) {
 	}
 }
 
+func doFrostDKG(operators []types.OperatorID) (map[uint32]*dkg.KeyGenOutcome, error) {
+
+	requestID := getRandRequestID()
+
+	dkgsigner := testingutils.NewTestingKeyManager()
+	storage := testingutils.NewTestingStorage()
+	network := testingutils.NewTestingNetwork()
+
+	kgps := make(map[types.OperatorID]dkg.KeyGenProtocol)
+	for _, operatorID := range operators {
+		p := New(network, operatorID, requestID, dkgsigner, storage)
+		kgps[operatorID] = p
+	}
+
+	threshold := 2
+	outputs := make(map[uint32]*dkg.KeyGenOutcome)
+
+	// preparation round
+	initMsg := &dkg.Init{
+		OperatorIDs: operators,
+		Threshold:   uint16(threshold),
+	}
+
+	for _, operatorID := range operators {
+		if err := kgps[operatorID].Start(initMsg); err != nil {
+			return nil, errors.Wrapf(err, "failed to start dkg protocol for operator %d", operatorID)
+		}
+	}
+
+	rounds := []string{"round 1", "round 2", "keygen output"}
+
+	for _, round := range rounds {
+		fmt.Printf("proceeding with %s\n", round)
+
+		messages := network.BroadcastedMsgs
+		network.BroadcastedMsgs = make([]*types.SSVMessage, 0)
+
+		for _, msg := range messages {
+			dkgMsg := &dkg.SignedMessage{}
+			if err := dkgMsg.Decode(msg.Data); err != nil {
+				return nil, err
+			}
+
+			for _, operatorID := range operators {
+				if operatorID == dkgMsg.Signer {
+					continue
+				}
+
+				finished, output, err := kgps[operatorID].ProcessMsg(dkgMsg)
+				if err != nil {
+					return nil, err
+				}
+
+				if finished {
+					outputs[uint32(operatorID)] = output
+				}
+			}
+		}
+	}
+	return outputs, nil
+}
+
+func resetRandSeed() {
+	src := mrand.NewSource(1)
+	src.Seed(12345)
+	crand.Reader = mrand.New(src)
+}
+
+type dkgTestOutput struct {
+	Share           map[uint32]string
+	ValidatorPK     string
+	OperatorPubKeys map[uint32]string
+	Threshold       uint64
+}
+
+func (dkgoutput dkgTestOutput) toKeyGenOutputMap() map[uint32]*dkg.KeyGenOutput {
+	ret := make(map[uint32]*dkg.KeyGenOutput)
+
+	opPublicKeys := make(map[types.OperatorID]*bls.PublicKey)
+	for opID, publicKey := range dkgoutput.OperatorPubKeys {
+		pk := &bls.PublicKey{}
+		_ = pk.DeserializeHexStr(publicKey)
+
+		opPublicKeys[types.OperatorID(opID)] = pk
+
+		share := dkgoutput.Share[opID]
+
+		sk := &bls.SecretKey{}
+		_ = sk.DeserializeHexStr(share)
+
+		vk, _ := hex.DecodeString(dkgoutput.ValidatorPK)
+
+		ret[opID] = &dkg.KeyGenOutput{
+			Share:           sk,
+			ValidatorPK:     vk,
+			OperatorPubKeys: opPublicKeys,
+			Threshold:       dkgoutput.Threshold,
+		}
+	}
+
+	return ret
+}
+
 func getRandRequestID() dkg.RequestID {
 	requestID := dkg.RequestID{}
 	for i := range requestID {
@@ -300,112 +298,4 @@ func getSignedMessage(requestID dkg.RequestID, operatorID types.OperatorID, data
 	sig, _ := signer.SignDKGOutput(signedMessage, op.ETHAddress)
 	signedMessage.Signature = sig
 	return signedMessage
-}
-
-func TestProcessBlameTypeInconsistentMessage(t *testing.T) {
-
-	reqID := getRandRequestID()
-	dataBytes, _ := getSignedMessage(reqID, 1, []byte{1, 1, 1, 1}).Encode()
-	sameDataBytes, _ := getSignedMessage(reqID, 1, []byte{1, 1, 1, 1}).Encode()
-	tamperedDataBytes, _ := getSignedMessage(reqID, 1, []byte{2, 2, 2, 2}).Encode()
-
-	tests := map[string]struct {
-		blameMessage *BlameMessage
-		expected     bool
-	}{
-		"blame_req_is_invalid": {
-			blameMessage: &BlameMessage{
-				Type:      InconsistentMessage,
-				BlameData: [][]byte{dataBytes, sameDataBytes},
-			},
-			expected: false,
-		},
-		"blame_req_is_valid": {
-			blameMessage: &BlameMessage{
-				Type:      InconsistentMessage,
-				BlameData: [][]byte{dataBytes, tamperedDataBytes},
-			},
-			expected: true,
-		},
-	}
-
-	for name, test := range tests {
-		t.Run(name, func(t *testing.T) {
-			fr := &FROST{}
-			got, err := fr.processBlameTypeInconsistentMessage(1, test.blameMessage)
-			if err != nil {
-				t.Error(err)
-			}
-
-			if got != test.expected {
-				t.Fatalf("expected %t got %t", test.expected, got)
-			}
-		})
-	}
-}
-
-func TestProcessBlameTypeInvalidShare(t *testing.T) {
-
-	// Test with valid share i.e invalid blame request
-	fldmn, _ := sharing.NewFeldman(2, 4, thisCurve)
-	verifiers, shares, _ := fldmn.Split(thisCurve.Scalar.Random(crand.Reader), crand.Reader)
-
-	commitments := make([][]byte, 0)
-	for _, commitment := range verifiers.Commitments {
-		commitments = append(commitments, commitment.ToAffineCompressed())
-	}
-
-	sessionSK, _ := ecies.GenerateKey()
-	operatorShare := shares[0] // share for operatorID 1
-	eShare, _ := ecies.Encrypt(sessionSK.PublicKey, operatorShare.Value)
-
-	round1Message := &Round1Message{
-		Commitment: commitments,
-		Shares: map[uint32][]byte{
-			1: eShare,
-		},
-	}
-	round1Bytes, _ := json.Marshal(round1Message)
-
-	blameData := make([][]byte, 0)
-	blameData = append(blameData, round1Bytes)
-
-	blameMessage := &BlameMessage{
-		Type:             InvalidShare,
-		TargetOperatorID: 1,
-		BlameData:        blameData,
-		BlamerSessionSk:  sessionSK.Bytes(),
-	}
-
-	network := testingutils.NewTestingNetwork()
-	dkgsigner := testingutils.NewTestingKeyManager()
-	storage := testingutils.NewTestingStorage()
-
-	kgp := New(network, 2, getRandRequestID(), dkgsigner, storage)
-	fr := kgp.(*FROST)
-
-	valid, err := fr.processBlameTypeInvalidShare(1, blameMessage)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// blame request is invalid
-	require.Equal(t, valid, false)
-
-	// Test with invalid share i.e valid blame request
-	invalidShare := shares[2].Value
-	eInvalidShare, _ := ecies.Encrypt(sessionSK.PublicKey, invalidShare)
-	round1Message.Shares[1] = eInvalidShare
-
-	round1Bytes, _ = json.Marshal(round1Message)
-	blameData[0] = round1Bytes
-	blameMessage.BlameData = blameData
-
-	valid, err = fr.processBlameTypeInvalidShare(1, blameMessage)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	// blame request is valid
-	require.Equal(t, valid, true)
 }

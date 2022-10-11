@@ -34,6 +34,7 @@ func (fr *FROST) processRound1() error {
 
 		share := &bls.SecretKey{}
 		shamirShare := p2pMessages[operatorID]
+
 		if err := share.Deserialize(shamirShare.Value); err != nil {
 			return err
 		}
