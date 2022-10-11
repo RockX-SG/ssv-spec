@@ -60,7 +60,7 @@ func resetRandSeed() {
 	crand.Reader = mrand.New(src)
 }
 
-func doFrostDKG(operators []types.OperatorID) (map[uint32]*dkg.KeyGenOutput, error) {
+func doFrostDKG(operators []types.OperatorID) (map[uint32]*dkg.KeyGenOutcome, error) {
 	resetRandSeed()
 
 	requestID := getRandRequestID()
@@ -76,7 +76,7 @@ func doFrostDKG(operators []types.OperatorID) (map[uint32]*dkg.KeyGenOutput, err
 	}
 
 	threshold := 2
-	outputs := make(map[uint32]*dkg.KeyGenOutput)
+	outputs := make(map[uint32]*dkg.KeyGenOutcome)
 
 	// preparation round
 	initMsg := &dkg.Init{
@@ -154,7 +154,7 @@ func TestFrostDKG(t *testing.T) {
 	}
 
 	for _, operatorID := range operators {
-		output := outputs[uint32(operatorID)]
+		output := outputs[uint32(operatorID)].KeyGenOutput
 
 		require.Equal(t, expectedFrostOutput.ValidatorPK, hex.EncodeToString(output.ValidatorPK))
 		require.Equal(t, expectedFrostOutput.Share[uint32(operatorID)], output.Share.SerializeToHexStr())
@@ -166,6 +166,7 @@ func TestFrostDKG(t *testing.T) {
 
 var (
 	expectedResharingOutput = dkgTestOutput{
+		Threshold: 2,
 		Share: map[uint32]string{
 			5: "4f0e5d306131bf4cd73c68d6f3ba9c6222e92d514a36dfe0ec1c6d2639cd5303",
 			6: "5b8e17de8d9403af83d004ddde93b544d0f84201b0a92adb2704eb7dded98844",
@@ -229,7 +230,7 @@ func TestResharing(t *testing.T) {
 
 	rounds := []string{"round 1", "round 2", "keygen output"}
 
-	outputs := make(map[uint32]*dkg.KeyGenOutput)
+	outputs := make(map[uint32]*dkg.KeyGenOutcome)
 
 	for _, round := range rounds {
 		fmt.Printf("proceeding with %s\n", round)
@@ -262,7 +263,7 @@ func TestResharing(t *testing.T) {
 	}
 
 	for _, operatorID := range operators {
-		output := outputs[uint32(operatorID)]
+		output := outputs[uint32(operatorID)].KeyGenOutput
 
 		require.Equal(t, expectedResharingOutput.ValidatorPK, hex.EncodeToString(output.ValidatorPK))
 		require.Equal(t, expectedResharingOutput.Share[uint32(operatorID)], output.Share.SerializeToHexStr())
@@ -281,7 +282,7 @@ func getRandRequestID() dkg.RequestID {
 	return requestID
 }
 
-func getSignedMessage(requestID dkg.RequestID, operatorID types.OperatorID) *dkg.SignedMessage {
+func getSignedMessage(requestID dkg.RequestID, operatorID types.OperatorID, data []byte) *dkg.SignedMessage {
 	storage := testingutils.NewTestingStorage()
 	signer := testingutils.NewTestingKeyManager()
 
@@ -289,7 +290,7 @@ func getSignedMessage(requestID dkg.RequestID, operatorID types.OperatorID) *dkg
 		Message: &dkg.Message{
 			MsgType:    dkg.ProtocolMsgType,
 			Identifier: requestID,
-			Data:       []byte{1, 1, 1, 1, 1},
+			Data:       data,
 		},
 		Signer:    operatorID,
 		Signature: nil,
@@ -302,40 +303,30 @@ func getSignedMessage(requestID dkg.RequestID, operatorID types.OperatorID) *dkg
 }
 
 func TestProcessBlameTypeInconsistentMessage(t *testing.T) {
+
 	reqID := getRandRequestID()
-
-	data := getSignedMessage(reqID, 1)
-	dataBytes, _ := data.Encode()
-
-	validData := getSignedMessage(reqID, 1)
-	validDataBytes, _ := validData.Encode()
-
-	// tamperedData := getSignedMessage(reqID, 1)
-	// tamperedData.Message.Data = []byte{2, 2, 2, 2, 2}
-	// tamperedDataBytes, _ := tamperedData.Encode()
+	dataBytes, _ := getSignedMessage(reqID, 1, []byte{1, 1, 1, 1}).Encode()
+	sameDataBytes, _ := getSignedMessage(reqID, 1, []byte{1, 1, 1, 1}).Encode()
+	tamperedDataBytes, _ := getSignedMessage(reqID, 1, []byte{2, 2, 2, 2}).Encode()
 
 	tests := map[string]struct {
 		blameMessage *BlameMessage
 		expected     bool
 	}{
+		"blame_req_is_invalid": {
+			blameMessage: &BlameMessage{
+				Type:      InconsistentMessage,
+				BlameData: [][]byte{dataBytes, sameDataBytes},
+			},
+			expected: false,
+		},
 		"blame_req_is_valid": {
 			blameMessage: &BlameMessage{
 				Type:      InconsistentMessage,
-				BlameData: [][]byte{dataBytes, validDataBytes},
+				BlameData: [][]byte{dataBytes, tamperedDataBytes},
 			},
 			expected: true,
 		},
-		/*
-			TODO: Uncomment this section once signed message's validate
-			function is implemented
-		*/
-		// "blame_req_is_invalid": {
-		// 	blameMessage: &BlameMessage{
-		// 		Type:      InconsistentMessage,
-		// 		BlameData: [][]byte{dataBytes, tamperedDataBytes},
-		// 	},
-		// 	expected: false,
-		// },
 	}
 
 	for name, test := range tests {
@@ -354,7 +345,8 @@ func TestProcessBlameTypeInconsistentMessage(t *testing.T) {
 }
 
 func TestProcessBlameTypeInvalidShare(t *testing.T) {
-	// Test with valid share
+
+	// Test with valid share i.e invalid blame request
 	fldmn, _ := sharing.NewFeldman(2, 4, thisCurve)
 	verifiers, shares, _ := fldmn.Split(thisCurve.Scalar.Random(crand.Reader), crand.Reader)
 
@@ -396,9 +388,11 @@ func TestProcessBlameTypeInvalidShare(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.Equal(t, valid, true)
 
-	// Test with invalid share
+	// blame request is invalid
+	require.Equal(t, valid, false)
+
+	// Test with invalid share i.e valid blame request
 	invalidShare := shares[2].Value
 	eInvalidShare, _ := ecies.Encrypt(sessionSK.PublicKey, invalidShare)
 	round1Message.Shares[1] = eInvalidShare
@@ -411,6 +405,7 @@ func TestProcessBlameTypeInvalidShare(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	require.Equal(t, valid, false)
 
+	// blame request is valid
+	require.Equal(t, valid, true)
 }

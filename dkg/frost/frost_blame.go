@@ -1,6 +1,8 @@
 package frost
 
 import (
+	"crypto/sha256"
+
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/coinbase/kryptology/pkg/sharing"
 	ecies "github.com/ecies/go/v2"
@@ -79,14 +81,14 @@ func (fr *FROST) processBlameTypeInvalidShare(operatorID uint32, blameMessage *B
 		Value: shareBytes,
 	}
 
-	if err := verifiers.Verify(share); err != nil {
-		if err.Error() == "not equal" {
-			return false, nil
-		}
+	err = verifiers.Verify(share)
+	if err == nil {
+		return false, nil // blame request is invalid since share is valid
+	}
+	if err != nil && err.Error() != "not equal" {
 		return false, err
 	}
-
-	return true, nil
+	return true, nil // err.Error() == "not equal" -> blame request is valid
 }
 
 func (fr *FROST) processBlameTypeInconsistentMessage(operatorID uint32, blameMessage *BlameMessage) (bool /*valid*/, error) {
@@ -96,17 +98,15 @@ func (fr *FROST) processBlameTypeInconsistentMessage(operatorID uint32, blameMes
 	}
 
 	var originalMessage, newMessage dkg.SignedMessage
-
 	if err := originalMessage.Decode(blameMessage.BlameData[0]); err != nil {
 		return false, err
 	}
-
 	if err := newMessage.Decode(blameMessage.BlameData[1]); err != nil {
 		return false, err
 	}
 
-	valid := (originalMessage.Validate() == nil) && (newMessage.Validate() == nil)
-	return valid, nil
+	// if data hash is not equal then the blame request is valid
+	return !fr.compareDataHash(&originalMessage, &newMessage), nil
 }
 
 func (fr *FROST) createBlameTypeInconsistentMessageRequest(originalMessage, newMessage *dkg.SignedMessage) error {
@@ -156,4 +156,8 @@ func (fr *FROST) createBlameTypeInvalidShareRequest(operatorID uint32) error {
 		},
 	}
 	return fr.broadcastDKGMessage(msg)
+}
+
+func (fr *FROST) compareDataHash(originalMessage, newMessage *dkg.SignedMessage) bool {
+	return sha256.Sum256(originalMessage.Message.Data) == sha256.Sum256(newMessage.Message.Data)
 }

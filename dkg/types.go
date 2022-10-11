@@ -44,3 +44,9 @@ type ErrInvalidRound struct{}
 func (e ErrInvalidRound) Error() string {
 	return "invalid dkg round"
 }
+
+type ErrMismatchRound struct{}
+
+func (e ErrMismatchRound) Error() string {
+	return "mismatch dkg round"
+}

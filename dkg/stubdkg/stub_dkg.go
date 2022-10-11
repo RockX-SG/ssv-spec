@@ -2,6 +2,7 @@ package stubdkg
 
 import (
 	"fmt"
+
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/herumi/bls-eth-go-binary/bls"
@@ -41,7 +42,7 @@ func (s *DKG) Start(init *dkg.Init) error {
 	return nil
 }
 
-func (s *DKG) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, error) {
+func (s *DKG) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, error) {
 	// TODO validate msg
 
 	dataMsg := &ProtocolMsg{}
@@ -77,7 +78,7 @@ func (s *DKG) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, error
 					4: s.operatorShares[4].GetPublicKey(),
 				},
 			}
-			return true, ret, nil
+			return true, &dkg.KeyGenOutcome{KeyGenOutput: ret}, nil
 		}
 	}
 	return false, nil, nil
