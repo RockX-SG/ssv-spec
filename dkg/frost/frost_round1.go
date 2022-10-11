@@ -6,9 +6,11 @@ import (
 )
 
 func (fr *FROST) processRound1() error {
+
 	if !fr.needToRunThisRound(Round1) {
 		return nil
 	}
+
 	skI, err := fr.partialInterpolate()
 	if err != nil {
 		return err
@@ -45,9 +47,8 @@ func (fr *FROST) processRound1() error {
 		shares[operatorID] = encryptedShare
 	}
 
-	fr.state.currentRound = Round1
 	msg := &ProtocolMsg{
-		Round: Round1,
+		Round: fr.state.currentRound,
 		Round1Message: &Round1Message{
 			Commitment: commitments,
 			ProofS:     bCastMessage.Wi.Bytes(),
@@ -64,6 +65,7 @@ func (fr *FROST) partialInterpolate() ([]byte, error) {
 	}
 
 	skI := new(bls.Fr)
+
 	indices := make([]bls.Fr, fr.state.oldKeyGenOutput.Threshold+1)
 	values := make([]bls.Fr, fr.state.oldKeyGenOutput.Threshold+1)
 	for i, id := range fr.state.operatorsOld {
@@ -74,8 +76,8 @@ func (fr *FROST) partialInterpolate() ([]byte, error) {
 			(&values[i]).SetInt64(0)
 		}
 	}
-	err := bls.FrLagrangeInterpolation(skI, indices, values)
-	if err != nil {
+
+	if err := bls.FrLagrangeInterpolation(skI, indices, values); err != nil {
 		return nil, err
 	}
 	return skI.Serialize(), nil

@@ -50,6 +50,7 @@ const (
 	Preparation
 	Round1
 	Round2
+	KeygenOutput
 	Blame
 )
 
@@ -88,7 +89,8 @@ func NewResharing(
 	requestID dkg.RequestID,
 	signer types.DKGSigner,
 	storage dkg.Storage,
-	oldKeyGenOutput dkg.KeyGenOutput,
+	oldKeyGenOutput *dkg.KeyGenOutput,
+	operatorsOld []uint32,
 ) dkg.KeyGenProtocol {
 
 	msgs := make(map[DKGRound]map[uint32]*dkg.SignedMessage)
@@ -106,7 +108,8 @@ func NewResharing(
 			msgs:            msgs,
 			identifier:      requestID,
 			operatorID:      operatorID,
-			oldKeyGenOutput: &oldKeyGenOutput,
+			operatorsOld:    operatorsOld,
+			oldKeyGenOutput: oldKeyGenOutput,
 			operatorShares:  make(map[uint32]*bls.SecretKey),
 		},
 	}
@@ -115,32 +118,21 @@ func NewResharing(
 // TODO: If Reshare, confirm participating operators using qbft before kick-starting this process.
 func (fr *FROST) Start(init *dkg.Init) error {
 
-	otherOperators := make([]uint32, 0)
-	for _, operatorID := range init.OperatorIDs {
-		if fr.state.operatorID == operatorID {
-			continue
-		}
-		otherOperators = append(otherOperators, uint32(operatorID))
-	}
-
-	operators := []uint32{uint32(fr.state.operatorID)}
-	operators = append(operators, otherOperators...)
-	fr.state.operators = operators
+	fr.state.currentRound = Preparation
+	fr.state.threshold = uint32(init.Threshold)
+	fr.state.operators = toUint32List(init.OperatorIDs)
 
 	ctx := make([]byte, 16)
 	if _, err := rand.Read(ctx); err != nil {
 		return err
 	}
 
-	participant, err := frost.NewDkgParticipant(uint32(fr.state.operatorID), uint32(len(operators)), string(ctx), thisCurve, otherOperators...)
+	participant, err := frost.NewDkgParticipant(uint32(fr.state.operatorID), uint32(len(fr.state.operators)), string(ctx), thisCurve, fr.state.operators...)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize a dkg participant")
 	}
-
 	fr.state.participant = participant
-	fr.state.threshold = uint32(init.Threshold)
 
-	fr.state.currentRound = Preparation
 	if fr.needToRunThisRound(Preparation) {
 		k, err := ecies.GenerateKey()
 		if err != nil {
@@ -148,13 +140,14 @@ func (fr *FROST) Start(init *dkg.Init) error {
 		}
 		fr.state.sessionSK = k
 		msg := &ProtocolMsg{
-			Round: Preparation,
+			Round: fr.state.currentRound,
 			PreparationMessage: &PreparationMessage{
 				SessionPk: k.PublicKey.Bytes(true),
 			},
 		}
 		return fr.broadcastDKGMessage(msg)
 	}
+
 	return nil
 }
 
@@ -184,22 +177,25 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, er
 
 	fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)] = msg
 
-	switch protocolMessage.Round {
+	switch fr.state.currentRound {
 	case Preparation:
 		// Received all
-		if fr.canProceedThisRound(Round1) {
+		if fr.canProceedThisRound() {
+			fr.state.currentRound = Round1
 			if err := fr.processRound1(); err != nil {
 				return false, nil, err
 			}
 		}
 	case Round1:
-		if fr.canProceedThisRound(Round2) {
+		if fr.canProceedThisRound() {
+			fr.state.currentRound = Round2
 			if err := fr.processRound2(); err != nil {
 				return false, nil, err
 			}
 		}
 	case Round2:
-		if fr.canProceedThisRound(-1) { // -1 checks if protocol has finished with round 2
+		if fr.canProceedThisRound() {
+			fr.state.currentRound = KeygenOutput
 			out, err := fr.processKeygenOutput()
 			if err != nil {
 				return false, nil, err
@@ -219,7 +215,7 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutput, er
 	return false, nil, nil
 }
 
-func (fr *FROST) canProceedThisRound(round DKGRound) bool {
+func (fr *FROST) canProceedThisRound() bool {
 
 	// Preparation (N) -> Round1 (O) -> Round2 (N)
 	switch fr.state.currentRound {
@@ -279,6 +275,8 @@ func (fr *FROST) needToRunThisRound(thisRound DKGRound) bool {
 	case Round1:
 		return fr.inOldCommittee()
 	case Round2:
+		return fr.inNewCommittee()
+	case KeygenOutput:
 		return fr.inNewCommittee()
 	default:
 		return false
@@ -346,4 +344,12 @@ func (fr *FROST) broadcastDKGMessage(msg *ProtocolMsg) error {
 
 	fr.state.msgs[fr.state.currentRound][uint32(fr.state.operatorID)] = bcastMessage
 	return fr.network.BroadcastDKGMessage(bcastMessage)
+}
+
+func toUint32List(operators []types.OperatorID) []uint32 {
+	l := make([]uint32, 0)
+	for _, opID := range operators {
+		l = append(l, uint32(opID))
+	}
+	return l
 }

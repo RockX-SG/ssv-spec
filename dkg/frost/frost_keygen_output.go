@@ -8,6 +8,11 @@ import (
 )
 
 func (fr *FROST) processKeygenOutput() (*dkg.KeyGenOutput, error) {
+
+	if !fr.needToRunThisRound(KeygenOutput) {
+		return nil, nil
+	}
+
 	if _, err := fr.verifyShares(); err != nil {
 		return nil, errors.Wrap(err, "failed to verify shares")
 	}

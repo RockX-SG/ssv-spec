@@ -2,6 +2,8 @@ module github.com/bloxapp/ssv-spec
 
 go 1.17
 
+replace github.com/coinbase/kryptology => ../kryptology // temporary
+
 require (
 	github.com/attestantio/go-eth2-client v0.11.3
 	github.com/coinbase/kryptology v1.8.0
