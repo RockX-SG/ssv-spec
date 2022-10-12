@@ -1,8 +1,10 @@
 package spectest
 
 import (
-	"github.com/bloxapp/ssv-spec/dkg/spectest/tests"
 	"testing"
+
+	"github.com/bloxapp/ssv-spec/dkg/spectest/tests"
+	"github.com/bloxapp/ssv-spec/dkg/spectest/tests/frost"
 )
 
 type SpecTest interface {
@@ -12,4 +14,7 @@ type SpecTest interface {
 
 var AllTests = []SpecTest{
 	tests.HappyFlow(),
+
+	frost.Keygen(),
+	// frost.Resharing(),
 }
