@@ -8,7 +8,7 @@ import (
 func (fr *FROST) processRound1() error {
 
 	if !fr.needToRunThisRound(Round1) {
-		return nil
+		return fr.state.participant.SkipRound1()
 	}
 
 	skI, err := fr.partialInterpolate()
