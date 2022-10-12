@@ -1,24 +1,19 @@
 package frost
 
 import (
-	crand "crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"math/big"
-	mrand "math/rand"
 	"testing"
 
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
-	"github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/pkg/errors"
 	"github.com/stretchr/testify/require"
 )
 
 var (
-	expectedFrostOutput = dkgTestOutput{
-		Threshold: 2,
+	expectedFrostOutput = testingutils.TestKeygenOutcome{
 		Share: map[uint32]string{
 			1: "285a26f43b026b246ca0c33b34aaf90890c016d943a75456efbe00d4d0bdee01",
 			2: "1d3701ab6e7b902bd482ac899ec7bab1852376ae234474bae1a3f83bb41dc48f",
@@ -37,7 +32,7 @@ var (
 
 func TestFrostDKG(t *testing.T) {
 
-	resetRandSeed()
+	testingutils.ResetRandSeed()
 
 	operators := []types.OperatorID{
 		1, 2, 3, 4,
@@ -60,8 +55,7 @@ func TestFrostDKG(t *testing.T) {
 }
 
 var (
-	expectedResharingOutput = dkgTestOutput{
-		Threshold: 2,
+	expectedResharingOutput = testingutils.TestKeygenOutcome{
 		Share: map[uint32]string{
 			5: "4f0e5d306131bf4cd73c68d6f3ba9c6222e92d514a36dfe0ec1c6d2639cd5303",
 			6: "5b8e17de8d9403af83d004ddde93b544d0f84201b0a92adb2704eb7dded98844",
@@ -80,35 +74,36 @@ var (
 
 func TestResharing(t *testing.T) {
 
-	resetRandSeed()
+	testingutils.ResetRandSeed()
+
+	threshold := uint64(2)
 
 	// Prepare keygen output from old operators
 	operatorsOld := []types.OperatorID{
 		1, 2, 3, 4,
 	}
+	operatorsOldUint32 := types.OperatorList(operatorsOld).ToUint32List()
 
-	outputFromOldOperators := expectedFrostOutput.toKeyGenOutputMap()
+	outputFromOldOperators := expectedFrostOutput.ToKeygenOutcomeMap(threshold, operatorsOldUint32)
 
-	requestID := getRandRequestID()
+	requestID := testingutils.GetRandRequestID()
+
 	operators := []types.OperatorID{
 		5, 6, 7, 8,
 	}
-
 	allOperators := append(operators, operatorsOld...)
 
 	dkgsigner := testingutils.NewTestingKeyManager()
 	storage := testingutils.NewTestingStorage()
 	network := testingutils.NewTestingNetwork()
 
-	threshold := 2
-
 	kgps := make(map[types.OperatorID]dkg.KeyGenProtocol)
 	for _, operatorID := range operatorsOld {
-		p := NewResharing(network, operatorID, requestID, dkgsigner, storage, outputFromOldOperators[uint32(operatorID)], toUint32List(operatorsOld[:threshold+1]))
+		p := NewResharing(network, operatorID, requestID, dkgsigner, storage, outputFromOldOperators[uint32(operatorID)], operatorsOldUint32[:threshold+1])
 		kgps[operatorID] = p
 	}
 	for _, operatorID := range operators {
-		p := NewResharing(network, operatorID, requestID, dkgsigner, storage, nil, toUint32List(operatorsOld[:threshold+1]))
+		p := NewResharing(network, operatorID, requestID, dkgsigner, storage, nil, operatorsOldUint32[:threshold+1])
 		kgps[operatorID] = p
 	}
 
@@ -170,7 +165,7 @@ func TestResharing(t *testing.T) {
 
 func doFrostDKG(operators []types.OperatorID) (map[uint32]*dkg.KeyGenOutcome, error) {
 
-	requestID := getRandRequestID()
+	requestID := testingutils.GetRandRequestID()
 
 	dkgsigner := testingutils.NewTestingKeyManager()
 	storage := testingutils.NewTestingStorage()
@@ -228,56 +223,6 @@ func doFrostDKG(operators []types.OperatorID) (map[uint32]*dkg.KeyGenOutcome, er
 		}
 	}
 	return outputs, nil
-}
-
-func resetRandSeed() {
-	src := mrand.NewSource(1)
-	src.Seed(12345)
-	crand.Reader = mrand.New(src)
-}
-
-type dkgTestOutput struct {
-	Share           map[uint32]string
-	ValidatorPK     string
-	OperatorPubKeys map[uint32]string
-	Threshold       uint64
-}
-
-func (dkgoutput dkgTestOutput) toKeyGenOutputMap() map[uint32]*dkg.KeyGenOutput {
-	ret := make(map[uint32]*dkg.KeyGenOutput)
-
-	opPublicKeys := make(map[types.OperatorID]*bls.PublicKey)
-	for opID, publicKey := range dkgoutput.OperatorPubKeys {
-		pk := &bls.PublicKey{}
-		_ = pk.DeserializeHexStr(publicKey)
-
-		opPublicKeys[types.OperatorID(opID)] = pk
-
-		share := dkgoutput.Share[opID]
-
-		sk := &bls.SecretKey{}
-		_ = sk.DeserializeHexStr(share)
-
-		vk, _ := hex.DecodeString(dkgoutput.ValidatorPK)
-
-		ret[opID] = &dkg.KeyGenOutput{
-			Share:           sk,
-			ValidatorPK:     vk,
-			OperatorPubKeys: opPublicKeys,
-			Threshold:       dkgoutput.Threshold,
-		}
-	}
-
-	return ret
-}
-
-func getRandRequestID() dkg.RequestID {
-	requestID := dkg.RequestID{}
-	for i := range requestID {
-		rndInt, _ := crand.Int(crand.Reader, big.NewInt(255))
-		requestID[i] = rndInt.Bytes()[0]
-	}
-	return requestID
 }
 
 func getSignedMessage(requestID dkg.RequestID, operatorID types.OperatorID, data []byte) *dkg.SignedMessage {

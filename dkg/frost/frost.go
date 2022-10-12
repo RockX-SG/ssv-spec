@@ -122,7 +122,7 @@ func (fr *FROST) Start(init *dkg.Init) error {
 
 	fr.state.currentRound = Preparation
 	fr.state.threshold = uint32(init.Threshold)
-	fr.state.operators = toUint32List(init.OperatorIDs)
+	fr.state.operators = types.OperatorList(init.OperatorIDs).ToUint32List()
 
 	ctx := make([]byte, 16)
 	if _, err := rand.Read(ctx); err != nil {
@@ -382,12 +382,4 @@ func (fr *FROST) broadcastDKGMessage(msg *ProtocolMsg) error {
 
 	fr.state.msgs[fr.state.currentRound][uint32(fr.state.operatorID)] = bcastMessage
 	return fr.network.BroadcastDKGMessage(bcastMessage)
-}
-
-func toUint32List(operators []types.OperatorID) []uint32 {
-	l := make([]uint32, 0)
-	for _, opID := range operators {
-		l = append(l, uint32(opID))
-	}
-	return l
 }

@@ -13,7 +13,7 @@ import (
 
 func TestProcessBlameTypeInconsistentMessage(t *testing.T) {
 
-	reqID := getRandRequestID()
+	reqID := testingutils.GetRandRequestID()
 	dataBytes, _ := getSignedMessage(reqID, 1, []byte{1, 1, 1, 1}).Encode()
 	sameDataBytes, _ := getSignedMessage(reqID, 1, []byte{1, 1, 1, 1}).Encode()
 	tamperedDataBytes, _ := getSignedMessage(reqID, 1, []byte{2, 2, 2, 2}).Encode()
@@ -95,7 +95,7 @@ func TestProcessBlameTypeInvalidShare(t *testing.T) {
 	frost := New(
 		testingutils.NewTestingNetwork(),
 		2, /* operatorID */
-		getRandRequestID(),
+		testingutils.GetRandRequestID(),
 		testingutils.NewTestingKeyManager(),
 		testingutils.NewTestingStorage(),
 	).(*FROST)

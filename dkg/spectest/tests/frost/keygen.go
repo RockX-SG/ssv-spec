@@ -1,16 +1,18 @@
 package frost
 
-import "github.com/bloxapp/ssv-spec/types"
+import (
+	"github.com/bloxapp/ssv-spec/types"
+	"github.com/bloxapp/ssv-spec/types/testingutils"
+)
 
 func Keygen() *FrostSpecTest {
 	return &FrostSpecTest{
+		Name: "Simple Keygen",
+
 		Threshold: 2,
 		Operators: []types.OperatorID{1, 2, 3, 4},
-		ExpectedOutcome: struct {
-			ValidatorPK     string
-			Share           map[uint32]string
-			OperatorPubKeys map[uint32]string
-		}{
+
+		ExpectedOutcome: testingutils.TestKeygenOutcome{
 			ValidatorPK: "84d633334d8d615d6739d1f011f2c9b194601e38213937999868ed9b016cab8500e16319a2866ed853411ce1628e84b3",
 			Share: map[uint32]string{
 				1: "285a26f43b026b246ca0c33b34aaf90890c016d943a75456efbe00d4d0bdee01",
