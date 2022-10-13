@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 
+	"github.com/bloxapp/ssv-spec/dkg"
+	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
 	"github.com/coinbase/kryptology/pkg/sharing"
 	ecies "github.com/ecies/go/v2"
@@ -123,4 +125,24 @@ func TestProcessBlameTypeInvalidShare(t *testing.T) {
 
 	// blame request is valid
 	require.Equal(t, true, valid)
+}
+
+func getSignedMessage(requestID dkg.RequestID, operatorID types.OperatorID, data []byte) *dkg.SignedMessage {
+	storage := testingutils.NewTestingStorage()
+	signer := testingutils.NewTestingKeyManager()
+
+	signedMessage := &dkg.SignedMessage{
+		Message: &dkg.Message{
+			MsgType:    dkg.ProtocolMsgType,
+			Identifier: requestID,
+			Data:       data,
+		},
+		Signer:    operatorID,
+		Signature: nil,
+	}
+
+	_, op, _ := storage.GetDKGOperator(operatorID)
+	sig, _ := signer.SignDKGOutput(signedMessage, op.ETHAddress)
+	signedMessage.Signature = sig
+	return signedMessage
 }

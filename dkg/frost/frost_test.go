@@ -2,7 +2,6 @@ package frost
 
 import (
 	"encoding/hex"
-	"fmt"
 	"testing"
 
 	"github.com/bloxapp/ssv-spec/dkg"
@@ -32,13 +31,17 @@ var (
 
 func TestFrostDKG(t *testing.T) {
 
-	testingutils.ResetRandSeed()
-
 	operators := []types.OperatorID{
 		1, 2, 3, 4,
 	}
 
-	outputs, err := doFrostDKG(operators)
+	outputs, err := TestingFrost(
+		2,
+		operators,
+		nil,
+		false,
+		nil,
+	)
 	if err != nil {
 		t.Error(err)
 	}
@@ -74,99 +77,38 @@ var (
 
 func TestResharing(t *testing.T) {
 
-	testingutils.ResetRandSeed()
-
-	threshold := uint64(2)
-
-	// Prepare keygen output from old operators
 	operatorsOld := []types.OperatorID{
 		1, 2, 3, 4,
 	}
-	operatorsOldUint32 := types.OperatorList(operatorsOld).ToUint32List()
-
-	outputFromOldOperators := expectedFrostOutput.ToKeygenOutcomeMap(threshold, operatorsOldUint32)
-
-	requestID := testingutils.GetRandRequestID()
 
 	operators := []types.OperatorID{
 		5, 6, 7, 8,
 	}
-	allOperators := append(operators, operatorsOld...)
 
-	dkgsigner := testingutils.NewTestingKeyManager()
-	storage := testingutils.NewTestingStorage()
-	network := testingutils.NewTestingNetwork()
-
-	kgps := make(map[types.OperatorID]dkg.KeyGenProtocol)
-	for _, operatorID := range operatorsOld {
-		p := NewResharing(network, operatorID, requestID, dkgsigner, storage, outputFromOldOperators[uint32(operatorID)], operatorsOldUint32[:threshold+1])
-		kgps[operatorID] = p
-	}
-	for _, operatorID := range operators {
-		p := NewResharing(network, operatorID, requestID, dkgsigner, storage, nil, operatorsOldUint32[:threshold+1])
-		kgps[operatorID] = p
-	}
-
-	initMsg := &dkg.Init{
-		OperatorIDs: operators,
-		Threshold:   uint16(threshold),
-	}
-
-	for _, operatorID := range allOperators {
-		if err := kgps[operatorID].Start(initMsg); err != nil {
-			t.Error(errors.Wrapf(err, "failed to start dkg protocol for operator %d", operatorID))
-		}
-	}
-
-	rounds := []string{"round 1", "round 2", "keygen output"}
-
-	outputs := make(map[uint32]*dkg.KeyGenOutcome)
-
-	for _, round := range rounds {
-		fmt.Printf("proceeding with %s\n", round)
-
-		messages := network.BroadcastedMsgs
-		network.BroadcastedMsgs = make([]*types.SSVMessage, 0)
-
-		for _, msg := range messages {
-
-			dkgMsg := &dkg.SignedMessage{}
-			if err := dkgMsg.Decode(msg.Data); err != nil {
-				t.Error(err)
-			}
-
-			for _, operatorID := range allOperators {
-				if operatorID == dkgMsg.Signer {
-					continue
-				}
-
-				finished, output, err := kgps[operatorID].ProcessMsg(dkgMsg)
-				if err != nil {
-					t.Errorf("test failed in round %s  for op %d by %d err: %v", round, operatorID, dkgMsg.Signer, err)
-				}
-
-				if finished && output != nil {
-					outputs[uint32(operatorID)] = output
-				}
-			}
-		}
-	}
+	outcomes, _ := TestingFrost(
+		2,
+		operators,
+		operatorsOld,
+		true,
+		&expectedFrostOutput,
+	)
 
 	for _, operatorID := range operators {
-		output := outputs[uint32(operatorID)].KeyGenOutput
+		outcome := outcomes[uint32(operatorID)].KeyGenOutput
 
-		require.Equal(t, expectedResharingOutput.ValidatorPK, hex.EncodeToString(output.ValidatorPK))
-		require.Equal(t, expectedResharingOutput.Share[uint32(operatorID)], output.Share.SerializeToHexStr())
-		for opID, publicKey := range output.OperatorPubKeys {
+		require.Equal(t, expectedResharingOutput.ValidatorPK, hex.EncodeToString(outcome.ValidatorPK))
+		require.Equal(t, expectedResharingOutput.Share[uint32(operatorID)], outcome.Share.SerializeToHexStr())
+		for opID, publicKey := range outcome.OperatorPubKeys {
 			require.Equal(t, expectedResharingOutput.OperatorPubKeys[uint32(opID)], publicKey.SerializeToHexStr())
 		}
 	}
 }
 
-func doFrostDKG(operators []types.OperatorID) (map[uint32]*dkg.KeyGenOutcome, error) {
+func TestingFrost(threshold uint64, operators, operatorsOld []types.OperatorID, isResharing bool, oldKeygenOutcomes *testingutils.TestKeygenOutcome) (map[uint32]*dkg.KeyGenOutcome, error) {
+
+	testingutils.ResetRandSeed()
 
 	requestID := testingutils.GetRandRequestID()
-
 	dkgsigner := testingutils.NewTestingKeyManager()
 	storage := testingutils.NewTestingStorage()
 	network := testingutils.NewTestingNetwork()
@@ -177,70 +119,67 @@ func doFrostDKG(operators []types.OperatorID) (map[uint32]*dkg.KeyGenOutcome, er
 		kgps[operatorID] = p
 	}
 
-	threshold := 2
-	outputs := make(map[uint32]*dkg.KeyGenOutcome)
+	if isResharing {
+		operatorsOldList := types.OperatorList(operatorsOld).ToUint32List()
+		keygenOutcomeOld := oldKeygenOutcomes.ToKeygenOutcomeMap(threshold, operatorsOldList)
 
-	// preparation round
+		for _, operatorID := range operatorsOld {
+			p := NewResharing(network, operatorID, requestID, dkgsigner, storage, keygenOutcomeOld[uint32(operatorID)], operatorsOldList[:threshold+1])
+			kgps[operatorID] = p
+
+		}
+
+		for _, operatorID := range operators {
+			p := NewResharing(network, operatorID, requestID, dkgsigner, storage, nil, operatorsOldList[:threshold+1])
+			kgps[operatorID] = p
+		}
+	}
+
+	alloperators := operators
+	if isResharing {
+		alloperators = append(alloperators, operatorsOld...)
+	}
+
 	initMsg := &dkg.Init{
 		OperatorIDs: operators,
 		Threshold:   uint16(threshold),
 	}
 
-	for _, operatorID := range operators {
+	for _, operatorID := range alloperators {
 		if err := kgps[operatorID].Start(initMsg); err != nil {
 			return nil, errors.Wrapf(err, "failed to start dkg protocol for operator %d", operatorID)
 		}
 	}
 
-	rounds := []string{"round 1", "round 2", "keygen output"}
-
-	for _, round := range rounds {
-		fmt.Printf("proceeding with %s\n", round)
+	outcomes := make(map[uint32]*dkg.KeyGenOutcome)
+	for i := 0; i < 3; i++ {
 
 		messages := network.BroadcastedMsgs
 		network.BroadcastedMsgs = make([]*types.SSVMessage, 0)
 
 		for _, msg := range messages {
+
 			dkgMsg := &dkg.SignedMessage{}
 			if err := dkgMsg.Decode(msg.Data); err != nil {
 				return nil, err
 			}
 
-			for _, operatorID := range operators {
+			for _, operatorID := range alloperators {
+
 				if operatorID == dkgMsg.Signer {
 					continue
 				}
 
-				finished, output, err := kgps[operatorID].ProcessMsg(dkgMsg)
+				finished, outcome, err := kgps[operatorID].ProcessMsg(dkgMsg)
 				if err != nil {
 					return nil, err
 				}
-
 				if finished {
-					outputs[uint32(operatorID)] = output
+					outcomes[uint32(operatorID)] = outcome
 				}
 			}
 		}
 	}
-	return outputs, nil
-}
 
-func getSignedMessage(requestID dkg.RequestID, operatorID types.OperatorID, data []byte) *dkg.SignedMessage {
-	storage := testingutils.NewTestingStorage()
-	signer := testingutils.NewTestingKeyManager()
-
-	signedMessage := &dkg.SignedMessage{
-		Message: &dkg.Message{
-			MsgType:    dkg.ProtocolMsgType,
-			Identifier: requestID,
-			Data:       data,
-		},
-		Signer:    operatorID,
-		Signature: nil,
-	}
-
-	_, op, _ := storage.GetDKGOperator(operatorID)
-	sig, _ := signer.SignDKGOutput(signedMessage, op.ETHAddress)
-	signedMessage.Signature = sig
-	return signedMessage
+	return outcomes, nil
 }
