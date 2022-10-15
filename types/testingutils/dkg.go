@@ -5,13 +5,14 @@ import (
 	"crypto/rsa"
 	"encoding/hex"
 	"fmt"
+	"strconv"
+
 	spec "github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/dkg/stubdkg"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/herumi/bls-eth-go-binary/bls"
-	"strconv"
 )
 
 var TestingWithdrawalCredentials, _ = hex.DecodeString("010000000000000000000000535953b5a6040074948cf185eaa7d2abbd66808f")
@@ -94,6 +95,7 @@ var DespositDataSigningRoot = func(keySet *TestKeySet, initMsg *dkg.Init) []byte
 }
 var (
 	encryptedDataCache = map[string][]byte{}
+	decryptedDataCache = map[string][]byte{}
 )
 
 func TestingEncryption(pk *rsa.PublicKey, data []byte) []byte {
@@ -104,6 +106,16 @@ func TestingEncryption(pk *rsa.PublicKey, data []byte) []byte {
 	cipherText, _ := types.Encrypt(pk, data)
 	encryptedDataCache[id] = cipherText
 	return cipherText
+}
+
+func TestingDecryption(sk *rsa.PrivateKey, data []byte) []byte {
+	id := hex.EncodeToString(sk.N.Bytes()) + fmt.Sprintf("%x", sk.E) + hex.EncodeToString(data)
+	if found := decryptedDataCache[id]; found != nil {
+		return found
+	}
+	plaintext, _ := types.Decrypt(sk, data)
+	decryptedDataCache[id] = plaintext
+	return plaintext
 }
 
 func (ks *TestKeySet) KeyGenOutput(opId types.OperatorID) *dkg.KeyGenOutput {

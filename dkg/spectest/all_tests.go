@@ -16,5 +16,5 @@ var AllTests = []SpecTest{
 	tests.HappyFlow(),
 
 	frost.Keygen(),
-	frost.Resharing(),
+	// frost.Resharing(),
 }

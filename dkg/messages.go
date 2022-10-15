@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/binary"
 	"encoding/json"
+
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/ethereum/go-ethereum/accounts/abi"
@@ -133,9 +134,9 @@ func (msg *Init) Validate() error {
 		return errors.New("invalid number of operators which has to be 3f+1")
 	}
 
-	if int(msg.Threshold) != (len(msg.OperatorIDs)-1)*2/3+1 {
-		return errors.New("invalid threshold which has to be 2f+1")
-	}
+	// if int(msg.Threshold) != (len(msg.OperatorIDs)-1)*2/3+1 {
+	// 	return errors.New("invalid threshold which has to be 2f+1")
+	// }
 
 	return nil
 }
