@@ -164,7 +164,7 @@ func TestingFrost(threshold uint64, operators, operatorsOld []types.OperatorID, 
 		}
 	}
 
-	for i := 0; i < 5; i++ {
+	for round := 1; round <= 5; round++ {
 
 		messages := network.BroadcastedMsgs
 		network.BroadcastedMsgs = make([]*types.SSVMessage, 0)
@@ -176,7 +176,12 @@ func TestingFrost(threshold uint64, operators, operatorsOld []types.OperatorID, 
 				return nil, err
 			}
 
-			for _, operatorID := range alloperators {
+			operatorList := alloperators
+			if isResharing && round > 2 {
+				operatorList = operators
+			}
+
+			for _, operatorID := range operatorList {
 
 				if operatorID == dkgMsg.Signer {
 					continue
