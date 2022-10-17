@@ -85,6 +85,7 @@ func New(
 	}
 }
 
+// Temporary, TODO: Remove and use interface with Reshare
 func NewResharing(
 	network dkg.Network,
 	operatorID types.OperatorID,
