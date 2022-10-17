@@ -168,8 +168,8 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 	}
 
 	originalMessage, ok := fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)]
-	if ok && !fr.compareDataHash(originalMessage, msg) {
-		return false, nil, fr.createBlameTypeInconsistentMessageRequest(originalMessage, msg)
+	if ok && !fr.haveSameRoot(originalMessage, msg) {
+		return false, nil, fr.createAndBroadcastBlameOfInconsistentMessage(originalMessage, msg)
 	}
 
 	fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)] = msg

@@ -1,8 +1,7 @@
 package frost
 
 import (
-	"crypto/sha256"
-
+	"bytes"
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/coinbase/kryptology/pkg/sharing"
 	ecies "github.com/ecies/go/v2"
@@ -106,10 +105,10 @@ func (fr *FROST) processBlameTypeInconsistentMessage(operatorID uint32, blameMes
 	}
 
 	// if data hash is not equal then the blame request is valid
-	return !fr.compareDataHash(&originalMessage, &newMessage), nil
+	return !fr.haveSameRoot(&originalMessage, &newMessage), nil
 }
 
-func (fr *FROST) createBlameTypeInconsistentMessageRequest(originalMessage, newMessage *dkg.SignedMessage) error {
+func (fr *FROST) createAndBroadcastBlameOfInconsistentMessage(originalMessage, newMessage *dkg.SignedMessage) error {
 
 	originalMessageBytes, err := originalMessage.Encode()
 	if err != nil {
@@ -137,7 +136,7 @@ func (fr *FROST) createBlameTypeInconsistentMessageRequest(originalMessage, newM
 	return fr.broadcastDKGMessage(msg)
 }
 
-func (fr *FROST) createBlameTypeInvalidShareRequest(operatorID uint32) error {
+func (fr *FROST) createAndBroadcastBlameOfInvalidShare(operatorID uint32) error {
 
 	round1Bytes, err := fr.state.msgs[Round1][operatorID].Encode()
 	if err != nil {
@@ -158,6 +157,14 @@ func (fr *FROST) createBlameTypeInvalidShareRequest(operatorID uint32) error {
 	return fr.broadcastDKGMessage(msg)
 }
 
-func (fr *FROST) compareDataHash(originalMessage, newMessage *dkg.SignedMessage) bool {
-	return sha256.Sum256(originalMessage.Message.Data) == sha256.Sum256(newMessage.Message.Data)
+func (fr *FROST) haveSameRoot(originalMessage, newMessage *dkg.SignedMessage) bool {
+	r1, err := originalMessage.GetRoot()
+	if err != nil {
+		return false
+	}
+	r2, err := newMessage.GetRoot()
+	if err != nil {
+		return false
+	}
+	return bytes.Compare(r1, r2) == 0
 }
