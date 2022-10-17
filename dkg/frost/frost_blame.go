@@ -2,6 +2,7 @@ package frost
 
 import (
 	"bytes"
+
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/coinbase/kryptology/pkg/sharing"
 	ecies "github.com/ecies/go/v2"
@@ -59,6 +60,10 @@ func (fr *FROST) processBlameTypeInvalidShare(operatorID uint32, blameMessage *B
 		return false, errors.Wrap(err, "unable to decode BlameData")
 	}
 
+	if err := fr.validateSignedMessage(signedMessage); err != nil {
+		return false, errors.Wrap(err, "failed to validate signature for blame data")
+	}
+
 	if signedMessage.Message.Identifier != fr.state.identifier {
 		return false, errors.New("the message doesn't belong to this session")
 	}
@@ -78,7 +83,7 @@ func (fr *FROST) processBlameTypeInvalidShare(operatorID uint32, blameMessage *B
 	blamerSessionSK := ecies.NewPrivateKeyFromBytes(blameMessage.BlamerSessionSk)
 
 	blamerSessionPK := blamerSessionSK.PublicKey.Bytes(true)
-	if bytes.Compare(blamerSessionPK, prepProtocolMessage.PreparationMessage.SessionPk) != 0 {
+	if !bytes.Equal(blamerSessionPK, prepProtocolMessage.PreparationMessage.SessionPk) {
 		return false, errors.New("blame's session pubkey is invalid")
 	}
 
@@ -123,6 +128,14 @@ func (fr *FROST) processBlameTypeInconsistentMessage(operatorID uint32, blameMes
 	}
 	if err := newMessage.Decode(blameMessage.BlameData[1]); err != nil {
 		return false, err
+	}
+
+	if err := fr.validateSignedMessage(&originalMessage); err != nil {
+		return false, errors.Wrap(err, "failed to validate signature for blame data")
+	}
+
+	if err := fr.validateSignedMessage(&newMessage); err != nil {
+		return false, errors.Wrap(err, "failed to validate signature for blame data")
 	}
 
 	if originalMessage.Message.Identifier != fr.state.identifier {
