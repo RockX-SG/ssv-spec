@@ -174,6 +174,14 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 
 	fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)] = msg
 
+	if protocolMessage.Round == Blame {
+		out, err := fr.processBlame()
+		if err != nil {
+			return false, nil, err
+		}
+		return true, &dkg.KeyGenOutcome{BlameOutput: out}, err
+	}
+
 	switch fr.state.currentRound {
 	case Preparation:
 		// Received all
@@ -199,12 +207,6 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 			}
 			return true, &dkg.KeyGenOutcome{KeyGenOutput: out}, nil
 		}
-	case Blame:
-		out, err := fr.processBlame()
-		if err != nil {
-			return false, nil, err
-		}
-		return true, &dkg.KeyGenOutcome{BlameOutput: out}, err
 	default:
 		return true, nil, dkg.ErrInvalidRound{}
 	}
