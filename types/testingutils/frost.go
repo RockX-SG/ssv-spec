@@ -54,7 +54,11 @@ func GetRandRequestID() dkg.RequestID {
 	requestID := dkg.RequestID{}
 	for i := range requestID {
 		rndInt, _ := crand.Int(crand.Reader, big.NewInt(255))
-		requestID[i] = rndInt.Bytes()[0]
+		if rndInt == big.NewInt(0) {
+			requestID[i] = 0
+		} else {
+			requestID[i] = rndInt.Bytes()[0]
+		}
 	}
 	return requestID
 }
