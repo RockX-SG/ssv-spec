@@ -54,9 +54,32 @@ func (fr *FROST) processBlameTypeInvalidShare(operatorID uint32, blameMessage *B
 		return false, errors.New("invalid blame data")
 	}
 
+	signedMessage := &dkg.SignedMessage{}
+	if err := signedMessage.Decode(blameMessage.BlameData[0]); err != nil {
+		return false, errors.Wrap(err, "unable to decode BlameData")
+	}
+
+	if signedMessage.Message.Identifier != fr.state.identifier {
+		return false, errors.New("the message doesn't belong to this session")
+	}
+
 	round1Message := &Round1Message{}
-	if err := round1Message.Decode(blameMessage.BlameData[0]); err != nil {
-		return false, err
+	if err := round1Message.Decode(signedMessage.Message.Data); err != nil {
+		return false, errors.Wrap(err, "unable to decode Round1Message")
+	}
+
+	blamesPrepMessage := fr.state.msgs[Preparation][operatorID]
+	prepProtocolMessage := &ProtocolMsg{}
+	err := prepProtocolMessage.Decode(blamesPrepMessage.Message.Data)
+	if err != nil || prepProtocolMessage.PreparationMessage == nil {
+		return false, errors.New("unable to decode blamer's PreparationMessage")
+	}
+
+	blamerSessionSK := ecies.NewPrivateKeyFromBytes(blameMessage.BlamerSessionSk)
+
+	blamerSessionPK := blamerSessionSK.PublicKey.Bytes(true)
+	if bytes.Compare(blamerSessionPK, prepProtocolMessage.PreparationMessage.SessionPk) != 0 {
+		return false, errors.New("blame's session pubkey is invalid")
 	}
 
 	verifiers := new(sharing.FeldmanVerifier)
@@ -68,7 +91,6 @@ func (fr *FROST) processBlameTypeInvalidShare(operatorID uint32, blameMessage *B
 		verifiers.Commitments = append(verifiers.Commitments, commitment)
 	}
 
-	blamerSessionSK := ecies.NewPrivateKeyFromBytes(blameMessage.BlamerSessionSk)
 	shareBytes, err := ecies.Decrypt(blamerSessionSK, round1Message.Shares[operatorID])
 	if err != nil {
 		return false, err
@@ -103,8 +125,30 @@ func (fr *FROST) processBlameTypeInconsistentMessage(operatorID uint32, blameMes
 		return false, err
 	}
 
-	// if data hash is not equal then the blame request is valid
-	return !fr.haveSameRoot(&originalMessage, &newMessage), nil
+	if originalMessage.Message.Identifier != fr.state.identifier {
+		return false, errors.New("the message doesn't belong to this session")
+	}
+
+	if originalMessage.Message.Identifier == newMessage.Message.Identifier {
+		return false, errors.New("the two messages don't belong to same session")
+	}
+
+	if fr.haveSameRoot(&originalMessage, &newMessage) {
+		return false, errors.New("the two messages are consistent")
+	}
+
+	protocolMessage1, protocolMessage2 := &ProtocolMsg{}, &ProtocolMsg{}
+	if err := protocolMessage1.Decode(originalMessage.Message.Data); err != nil {
+		return false, errors.Wrap(err, "failed to decode protocol msg")
+	}
+	if err := protocolMessage2.Decode(newMessage.Message.Data); err != nil {
+		return false, errors.Wrap(err, "failed to decode protocol msg")
+	}
+	if protocolMessage1.Round != protocolMessage2.Round {
+		return false, errors.New("the two messages don't belong the the same round")
+	}
+
+	return true, nil
 }
 
 func (fr *FROST) createAndBroadcastBlameOfInconsistentMessage(originalMessage, newMessage *dkg.SignedMessage) error {

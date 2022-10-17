@@ -35,6 +35,16 @@ type PreparationMessage struct {
 	SessionPk []byte
 }
 
+// Encode returns a msg encoded bytes or error
+func (msg *PreparationMessage) Encode() ([]byte, error) {
+	return json.Marshal(msg)
+}
+
+// Decode returns error if decoding failed
+func (msg *PreparationMessage) Decode(data []byte) error {
+	return json.Unmarshal(data, msg)
+}
+
 type Round1Message struct {
 	Commitment [][]byte
 	ProofS     []byte
