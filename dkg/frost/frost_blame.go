@@ -34,14 +34,13 @@ func (fr *FROST) processBlame() (*dkg.BlameOutput, error) {
 			return nil, err
 		}
 
-		blameMessageBytes, err := protocolMessage.BlameMessage.Encode()
+		serializedSigneMessage, err := msg.Encode()
 		if err != nil {
 			return nil, err
 		}
-
 		blameOutput := &dkg.BlameOutput{
 			Valid:        valid,
-			BlameMessage: blameMessageBytes,
+			BlameMessage: serializedSigneMessage,
 		}
 		return blameOutput, nil
 	}
