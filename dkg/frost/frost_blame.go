@@ -222,5 +222,5 @@ func (fr *FROST) haveSameRoot(originalMessage, newMessage *dkg.SignedMessage) bo
 	if err != nil {
 		return false
 	}
-	return bytes.Compare(r1, r2) == 0
+	return !bytes.Equal(r1, r2)
 }
