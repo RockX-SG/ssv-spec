@@ -1,50 +1,83 @@
 package frost
 
 import (
+	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
 )
 
 func Resharing() *FrostSpecTest {
-	return &FrostSpecTest{
-		Name: "Simple Resharing",
 
-		Threshold: 2,
-		Operators: []types.OperatorID{5, 6, 7, 8},
+	requestID := testingutils.GetRandRequestID()
+	ks := testingutils.Testing13SharesSet()
+
+	threshold := 2
+	operators := []types.OperatorID{5, 6, 7, 8}
+	operatorsOld := []types.OperatorID{1, 2, 3, 4}
+
+	initMsgBytes := testingutils.InitMessageDataBytes(
+		operators,
+		uint16(threshold),
+		testingutils.TestingWithdrawalCredentials,
+		testingutils.TestingForkVersion,
+	)
+
+	initMessages := make(map[uint32][]*dkg.SignedMessage)
+	for _, operatorID := range append(operators, operatorsOld...) {
+		initMessages[uint32(operatorID)] = []*dkg.SignedMessage{
+			testingutils.SignDKGMsg(ks.DKGOperators[operatorID].SK, operatorID, &dkg.Message{
+				MsgType:    dkg.InitMsgType,
+				Identifier: requestID,
+				Data:       initMsgBytes,
+			}),
+		}
+	}
+
+	return &FrostSpecTest{
+		Name:   "Simple Resharing",
+		Keyset: ks,
+
+		RequestID: requestID,
+		Threshold: uint64(threshold),
+		Operators: operators,
 
 		IsResharing:  true,
-		OperatorsOld: []types.OperatorID{1, 2, 3, 4},
+		OperatorsOld: operatorsOld,
 		OldKeygenOutcomes: &testingutils.TestKeygenOutcome{
-			ValidatorPK: "84d633334d8d615d6739d1f011f2c9b194601e38213937999868ed9b016cab8500e16319a2866ed853411ce1628e84b3",
+			ValidatorPK: "89a721d38bbcb78c396e61d7cf948b26432c72639bf343903b71989604e7df762c981c950ecd6567d79f98ed5eedb6b7",
 			Share: map[uint32]string{
-				1: "285a26f43b026b246ca0c33b34aaf90890c016d943a75456efbe00d4d0bdee01",
-				2: "1d3701ab6e7b902bd482ac899ec7bab1852376ae234474bae1a3f83bb41dc48f",
-				3: "42afa077e46dd25be4d7bb5be8734e77df5f074e0933f6ef6af8bdbe3e205cd0",
-				4: "67c262ae06e14097b7b3e5a1a36526d6640ac899407bf61fd38c3490e43afed4",
+				1: "02f026db6d82c36541076e8020955b658b435e592a03f70dce793d4c07694451",
+				2: "5d96593e5b076ee2b2ec7d2e7051790663b6af5d21d2263d47004ef7be6b9a9c",
+				3: "665bb970881643fd7881711a41017148b74063798e3375be47f4aaf585810e4b",
+				4: "130ed232fce2ddec6d64140ab534a159d52d246b132f4efe4ec4d2a581909e72",
 			},
 			OperatorPubKeys: map[uint32]string{
-				1: "960498d1f66481d570b80c2cb6fbafa40a250f46510412eb51abaf1b62aa17e747c8c40f69d01606cd29dd0466f4a9a2",
-				2: "a73f10841b40509f3a727a3311c77ee46ce0ae43ffdbd44aca87f837e392772834f51d1b38eacbe91d21057c0717a51b",
-				3: "8982bd51c3a08d8eb0d470eeb57fe3a8a8db4f426026019bf27a5faa745fc13bc75e3e2bea2435f47fa9148313959000",
-				4: "af4ce0c5ec16cc0d52acb5419d8b51051bcb271275680ab17c3a445d4de3c661971f19786667ab60216955bf20a13ea7",
+				1: "a7fb41890fa546935608ccecf76521d5b6d68288a3f01dfe83e786b0a691705f6661e0aa9bd6a38bf76b1d0d85e344a1",
+				2: "894fa7ba56be2a3b9e565a166da3e3a4817f808d8b83e127acaba2a900d7abbfb33691cbda913dd30ca6b7e83dc9232b",
+				3: "b89f855865521dbd29b9f4e5306d11ef34bb8806a3a4b8e5d16c43946439c0483ba59b3d8bf2aa960151ff083c1cde29",
+				4: "928cc98f610158e532b2caba36a64a511009976393d0566833b45a48396af751bb9a8f79210fcca2eb8bb48bb708e98b",
 			},
 		},
 
 		ExpectedOutcome: testingutils.TestKeygenOutcome{
-			ValidatorPK: "93946df0d733b1dd62c3946522a4a77d4a326a58de930b690fc5b65e9873c2e1b5c5854157aa4f87e7fd0b6e120064bc",
+			ValidatorPK: "ad8332f589d9fd8e77e3fd7d7b8d9e12a51d670921bbb10d0a8ff14349c67a98c407bd82789c0eadf9bec701fd4b638a",
 			Share: map[uint32]string{
-				5: "4f0e5d306131bf4cd73c68d6f3ba9c6222e92d514a36dfe0ec1c6d2639cd5303",
-				6: "5b8e17de8d9403af83d004ddde93b544d0f84201b0a92adb2704eb7dded98844",
-				7: "3a1db4e9bc49e01a51b3a7f1f6e4e6d874fd48ba51ffa222e215e631c7da1a5b",
-				8: "34b8336303cfb48b781d7128cafccac130ce9688f6144491052858e4483bdc7d",
+				5: "00771ef806c810d1dd0b357649e50ae05cd7258c34c3c8bc8c6b32e2fd36d346",
+				6: "7067c7a1b50d2c2fb157faccb2dfdfdb8af688764c8343fa25110483f3327e6b",
+				7: "739aa66202b7cec4caaefffe5d6fdde8150f804b1d6ceb6e2153d6aea95450e1",
+				8: "020243c0c8ab45a6a2af15634bf7288198f6a02414c712da2607d2e561ed2b83",
 			},
 			OperatorPubKeys: map[uint32]string{
-				5: "a421fee84bf68927dbe73f6ca4294bc025209759ce4e56ffd4b5d15cf15e6bfc166b327078ad570664c52bec282bb4c3",
-				6: "aded35f08c11c6a4e9e62c13a2e1095bfc0f88fa7f391d170f9037b43145446ddd18e90eb927979b2d56eb22de0a50be",
-				7: "a40d75cb13c200007b924a2590d74feec49529c1a3e1afb2c00f67a2beb46f27b7fc0ab9f66b774957c3a0a67cb33a57",
-				8: "ab6fa7c2f5db7ff70fa23e01f13804c019de9b270060b822ac54783df331ff23856d8957a18438914469f5cd8198ff0b",
+				5: "87e1a89911de8f07dccace6645f0a9eb83085fcd1821ceaeaa43ed1343d02865a8c611d70656490483dfd634e41e59e4",
+				6: "9924c984cfb3e0a1bb845e47e7fc0777088fca2b6b4629603365558117de7d4fa1f35968dd62111b849128dd5f0efd39",
+				7: "89a7daacc328fb19a7dc0a4b0cd7ecd3c49e666240e0873df88b7e4ec2918e18d634e42e6a029a0e9e6eaa093f31631a",
+				8: "82d9edad038b78edc91433ec1f96424bda76f1fb8dd11ee0f3c80a86b5355ed0918ea212a70b1f4bb4378b254b1de180",
 			},
 		},
 		ExpectedError: "",
+
+		InputMessages: map[int]MessagesForNodes{
+			0: initMessages,
+		},
 	}
 }

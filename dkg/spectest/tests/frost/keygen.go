@@ -1,32 +1,63 @@
 package frost
 
 import (
+	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
 )
 
 func Keygen() *FrostSpecTest {
-	return &FrostSpecTest{
-		Name: "Simple Keygen",
 
-		Threshold: 2,
-		Operators: []types.OperatorID{1, 2, 3, 4},
+	requestID := testingutils.GetRandRequestID()
+	ks := testingutils.Testing4SharesSet()
+
+	threshold := 2
+	operators := []types.OperatorID{1, 2, 3, 4}
+	initMsgBytes := testingutils.InitMessageDataBytes(
+		operators,
+		uint16(threshold),
+		testingutils.TestingWithdrawalCredentials,
+		testingutils.TestingForkVersion,
+	)
+
+	initMessages := make(map[uint32][]*dkg.SignedMessage)
+	for _, operatorID := range operators {
+		initMessages[uint32(operatorID)] = []*dkg.SignedMessage{
+			testingutils.SignDKGMsg(ks.DKGOperators[operatorID].SK, operatorID, &dkg.Message{
+				MsgType:    dkg.InitMsgType,
+				Identifier: requestID,
+				Data:       initMsgBytes,
+			}),
+		}
+	}
+
+	return &FrostSpecTest{
+		Name:   "Simple Keygen",
+		Keyset: ks,
+
+		RequestID: requestID,
+		Threshold: uint64(threshold),
+		Operators: operators,
 
 		ExpectedOutcome: testingutils.TestKeygenOutcome{
-			ValidatorPK: "84d633334d8d615d6739d1f011f2c9b194601e38213937999868ed9b016cab8500e16319a2866ed853411ce1628e84b3",
+			ValidatorPK: "89a721d38bbcb78c396e61d7cf948b26432c72639bf343903b71989604e7df762c981c950ecd6567d79f98ed5eedb6b7",
 			Share: map[uint32]string{
-				1: "285a26f43b026b246ca0c33b34aaf90890c016d943a75456efbe00d4d0bdee01",
-				2: "1d3701ab6e7b902bd482ac899ec7bab1852376ae234474bae1a3f83bb41dc48f",
-				3: "42afa077e46dd25be4d7bb5be8734e77df5f074e0933f6ef6af8bdbe3e205cd0",
-				4: "67c262ae06e14097b7b3e5a1a36526d6640ac899407bf61fd38c3490e43afed4",
+				1: "02f026db6d82c36541076e8020955b658b435e592a03f70dce793d4c07694451",
+				2: "5d96593e5b076ee2b2ec7d2e7051790663b6af5d21d2263d47004ef7be6b9a9c",
+				3: "665bb970881643fd7881711a41017148b74063798e3375be47f4aaf585810e4b",
+				4: "130ed232fce2ddec6d64140ab534a159d52d246b132f4efe4ec4d2a581909e72",
 			},
 			OperatorPubKeys: map[uint32]string{
-				1: "960498d1f66481d570b80c2cb6fbafa40a250f46510412eb51abaf1b62aa17e747c8c40f69d01606cd29dd0466f4a9a2",
-				2: "a73f10841b40509f3a727a3311c77ee46ce0ae43ffdbd44aca87f837e392772834f51d1b38eacbe91d21057c0717a51b",
-				3: "8982bd51c3a08d8eb0d470eeb57fe3a8a8db4f426026019bf27a5faa745fc13bc75e3e2bea2435f47fa9148313959000",
-				4: "af4ce0c5ec16cc0d52acb5419d8b51051bcb271275680ab17c3a445d4de3c661971f19786667ab60216955bf20a13ea7",
+				1: "a7fb41890fa546935608ccecf76521d5b6d68288a3f01dfe83e786b0a691705f6661e0aa9bd6a38bf76b1d0d85e344a1",
+				2: "894fa7ba56be2a3b9e565a166da3e3a4817f808d8b83e127acaba2a900d7abbfb33691cbda913dd30ca6b7e83dc9232b",
+				3: "b89f855865521dbd29b9f4e5306d11ef34bb8806a3a4b8e5d16c43946439c0483ba59b3d8bf2aa960151ff083c1cde29",
+				4: "928cc98f610158e532b2caba36a64a511009976393d0566833b45a48396af751bb9a8f79210fcca2eb8bb48bb708e98b",
 			},
 		},
 		ExpectedError: "",
+
+		InputMessages: map[int]MessagesForNodes{
+			0: initMessages,
+		},
 	}
 }
