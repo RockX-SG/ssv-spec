@@ -196,6 +196,8 @@ func (o *Output) GetRoot() ([]byte, error) {
 }
 
 type SignedOutput struct {
+	// Blame Data
+	BlameData *BlameData
 	// Data signed
 	Data *Output
 	// Signer Operator ID which signed
@@ -212,6 +214,45 @@ func (msg *SignedOutput) Encode() ([]byte, error) {
 // Decode returns error if decoding failed
 func (msg *SignedOutput) Decode(data []byte) error {
 	return json.Unmarshal(data, msg)
+}
+
+type BlameData struct {
+	RequestID    RequestID
+	Valid        bool
+	BlameMessage []byte
+}
+
+// Encode returns a msg encoded bytes or error
+func (msg *BlameData) Encode() ([]byte, error) {
+	return json.Marshal(msg)
+}
+
+// Decode returns error if decoding failed
+func (msg *BlameData) Decode(data []byte) error {
+	return json.Unmarshal(data, msg)
+}
+
+func (msg *BlameData) GetRoot() ([]byte, error) {
+	bytesSolidity, _ := abi.NewType("bytes", "", nil)
+	boolSolidity, _ := abi.NewType("bool", "", nil)
+
+	arguments := abi.Arguments{
+		{
+			Type: boolSolidity,
+		},
+		{
+			Type: bytesSolidity,
+		},
+	}
+
+	bytes, err := arguments.Pack(
+		msg.Valid,
+		[]byte(msg.BlameMessage),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return crypto.Keccak256(bytes), nil
 }
 
 func SignOutput(output *Output, privKey *ecdsa.PrivateKey) (types.Signature, error) {

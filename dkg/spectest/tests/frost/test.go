@@ -2,6 +2,7 @@ package frost
 
 import (
 	"encoding/hex"
+	"sort"
 	"testing"
 
 	"github.com/bloxapp/ssv-spec/dkg"
@@ -27,10 +28,10 @@ type FrostSpecTest struct {
 	// Resharing Options
 	IsResharing       bool
 	OperatorsOld      []types.OperatorID
-	OldKeygenOutcomes *testingutils.TestKeygenOutcome
+	OldKeygenOutcomes testingutils.TestOutcome
 
 	// Expected
-	ExpectedOutcome testingutils.TestKeygenOutcome
+	ExpectedOutcome testingutils.TestOutcome
 	ExpectedError   string
 
 	InputMessages map[int]MessagesForNodes
@@ -53,7 +54,6 @@ func (test *FrostSpecTest) Run(t *testing.T) {
 	for _, operatorID := range test.Operators {
 
 		outcome := outcomes[uint32(operatorID)]
-
 		if outcome.KeyGenOutput != nil {
 			vk := hex.EncodeToString(outcome.KeyGenOutput.ValidatorPK)
 			sk := outcome.KeyGenOutput.Share.SerializeToHexStr()
@@ -64,9 +64,13 @@ func (test *FrostSpecTest) Run(t *testing.T) {
 			t.Logf("sk %s\n", sk)
 			t.Logf("pk %s\n", pk)
 
-			require.Equal(t, test.ExpectedOutcome.ValidatorPK, vk)
-			require.Equal(t, test.ExpectedOutcome.Share[uint32(operatorID)], sk)
-			require.Equal(t, test.ExpectedOutcome.OperatorPubKeys[uint32(operatorID)], pk)
+			require.Equal(t, test.ExpectedOutcome.KeygenOutcome.ValidatorPK, vk)
+			require.Equal(t, test.ExpectedOutcome.KeygenOutcome.Share[uint32(operatorID)], sk)
+			require.Equal(t, test.ExpectedOutcome.KeygenOutcome.OperatorPubKeys[uint32(operatorID)], pk)
+		}
+
+		if outcome.BlameOutput != nil {
+			require.Equal(t, test.ExpectedOutcome.BlameOutcome.Valid, outcome.BlameOutput.Valid)
 		}
 	}
 
@@ -122,13 +126,15 @@ func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.KeyGenOutcome, error)
 				return nil, err
 			}
 
-			msgToBroadcast := msg
+			msgsToBroadcast := []*types.SSVMessage{}
 			if testMessage, ok := test.InputMessages[round][uint32(dkgMsg.Signer)]; ok {
 				testMessageBytes, _ := testMessage[0].Encode()
-				msgToBroadcast = &types.SSVMessage{
+				msgsToBroadcast = append(msgsToBroadcast, &types.SSVMessage{
 					MsgType: msg.MsgType,
 					Data:    testMessageBytes,
-				}
+				})
+			} else {
+				msgsToBroadcast = append(msgsToBroadcast, msg)
 			}
 
 			operatorList := alloperators
@@ -136,22 +142,39 @@ func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.KeyGenOutcome, error)
 				operatorList = test.Operators
 			}
 
+			sort.SliceStable(operatorList, func(i, j int) bool {
+				return operatorList[i] < operatorList[j]
+			})
+
 			for _, operatorID := range operatorList {
 
 				if operatorID == dkgMsg.Signer {
 					continue
 				}
-				if err := nodes[operatorID].ProcessMessage(msgToBroadcast); err != nil {
-					return nil, err
+
+				for _, msgToBroadcast := range msgsToBroadcast {
+					if err := nodes[operatorID].ProcessMessage(msgToBroadcast); err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
+
 	}
 
 	ret := make(map[uint32]*dkg.KeyGenOutcome)
-	outputs := network.DKGOutputs
+	outputs := nodes[test.Operators[0]].GetConfig().Network.(*testingutils.TestingNetwork).DKGOutputs
 
 	for operatorID, output := range outputs {
+		if output.BlameData != nil {
+			ret[uint32(operatorID)] = &dkg.KeyGenOutcome{
+				BlameOutput: &dkg.BlameOutput{
+					Valid:        output.BlameData.Valid,
+					BlameMessage: output.BlameData.BlameMessage,
+				},
+			}
+			continue
+		}
 
 		pk := &bls.PublicKey{}
 		pk.Deserialize(output.Data.SharePubKey)
@@ -205,7 +228,7 @@ func (test *FrostSpecTest) TestingFrostNodes(
 	if test.IsResharing {
 
 		operatorsOldList := types.OperatorList(test.OperatorsOld).ToUint32List()
-		keygenOutcomeOld := test.OldKeygenOutcomes.ToKeygenOutcomeMap(test.Threshold, operatorsOldList)
+		keygenOutcomeOld := test.OldKeygenOutcomes.KeygenOutcome.ToKeygenOutcomeMap(test.Threshold, operatorsOldList)
 
 		for _, operatorID := range test.OperatorsOld {
 

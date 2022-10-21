@@ -165,7 +165,7 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 		return false, nil, errors.Wrap(err, "failed to decode protocol msg")
 	}
 	if err := fr.validateProtocolMessage(protocolMessage); err != nil {
-		return false, nil, errors.New("failed to validate protocol message")
+		return false, nil, errors.Wrap(err, "failed to validate protocol message")
 	}
 
 	originalMessage, ok := fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)]
@@ -180,7 +180,7 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 		if err != nil {
 			return false, nil, err
 		}
-		return true, &dkg.KeyGenOutcome{BlameOutput: out}, err
+		return true, &dkg.KeyGenOutcome{BlameOutput: out}, nil
 	}
 
 	switch fr.state.currentRound {
@@ -196,6 +196,9 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 		if fr.canProceedThisRound() {
 			fr.state.currentRound = Round2
 			if err := fr.processRound2(); err != nil {
+				if err.Error() == "invalid share" {
+					return true, &dkg.KeyGenOutcome{BlameOutput: err.(ErrInvalidShare).BlameOutput}, nil
+				}
 				return false, nil, err
 			}
 		}
@@ -314,11 +317,15 @@ func (fr *FROST) validateSignedMessage(msg *dkg.SignedMessage) error {
 }
 
 func (fr *FROST) validateProtocolMessage(msg *ProtocolMsg) error {
+	if msg.Round == Blame && msg.BlameMessage != nil {
+		return nil
+	}
+
 	if msg.Round != fr.state.currentRound {
 		return dkg.ErrMismatchRound{}
 	}
 
-	if valid := msg.validate(fr.state.currentRound); !valid {
+	if valid := msg.validate(); !valid {
 		return errors.New("invalid message")
 	}
 	return nil
@@ -383,6 +390,10 @@ func (fr *FROST) broadcastDKGMessage(msg *ProtocolMsg) error {
 		return err
 	}
 
-	fr.state.msgs[fr.state.currentRound][uint32(fr.state.operatorID)] = bcastMessage
+	if msg.Round == Blame {
+		fr.state.msgs[Blame][uint32(fr.state.operatorID)] = bcastMessage
+	} else {
+		fr.state.msgs[fr.state.currentRound][uint32(fr.state.operatorID)] = bcastMessage
+	}
 	return fr.network.BroadcastDKGMessage(bcastMessage)
 }

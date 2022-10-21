@@ -46,7 +46,21 @@ func (r *Runner) ProcessMsg(msg *SignedMessage) (bool, map[types.OperatorID]*Sig
 
 		if finished {
 			r.KeygenOutcome = o
+		}
 
+		if finished && o.BlameOutput != nil {
+			ret, err := r.generateSignedOutputWithBlame(o)
+			if err != nil {
+				return false, nil, errors.Wrap(err, "could not generate dkg SignedOutput")
+			}
+
+			r.OutputMsgs[r.Operator.OperatorID] = ret
+			if err := r.signAndBroadcastMsg(ret, OutputMsgType); err != nil {
+				return false, nil, errors.Wrap(err, "could not broadcast outcome of blame")
+			}
+		}
+
+		if finished && o.KeyGenOutput != nil {
 			// generate deposit data
 			root, _, err := types.GenerateETHDepositData(
 				r.KeygenOutcome.KeyGenOutput.ValidatorPK,
@@ -190,13 +204,20 @@ func (r *Runner) validateSignedOutput(msg *SignedOutput) error {
 	// TODO: Separate fields match and signature validation
 	output := r.ownOutput()
 	if output != nil {
-		if output.Data.RequestID != msg.Data.RequestID {
-			return errors.New("got mismatching RequestID")
-		}
-		if !bytes.Equal(output.Data.ValidatorPubKey, msg.Data.ValidatorPubKey) {
-			return errors.New("got mismatching ValidatorPubKey")
+		if output.BlameData == nil {
+			if output.Data.RequestID != msg.Data.RequestID {
+				return errors.New("got mismatching RequestID")
+			}
+			if !bytes.Equal(output.Data.ValidatorPubKey, msg.Data.ValidatorPubKey) {
+				return errors.New("got mismatching ValidatorPubKey")
+			}
+		} else {
+			if output.BlameData.RequestID != msg.BlameData.RequestID {
+				return errors.New("got mismatching RequestID")
+			}
 		}
 	}
+
 	found, operator, err := r.config.Storage.GetDKGOperator(msg.Signer)
 	if !found {
 		return errors.New("unable to find signer")
@@ -205,10 +226,19 @@ func (r *Runner) validateSignedOutput(msg *SignedOutput) error {
 		return errors.Wrap(err, "unable to find signer")
 	}
 
-	root, err := msg.Data.GetRoot()
+	var (
+		root []byte
+	)
+
+	if msg.BlameData == nil {
+		root, err = msg.Data.GetRoot()
+	} else {
+		root, err = msg.BlameData.GetRoot()
+	}
 	if err != nil {
 		return errors.Wrap(err, "fail to get root")
 	}
+
 	pk, err := crypto.Ecrecover(root, msg.Signature)
 	if err != nil {
 		return errors.New("unable to recover public key")
@@ -253,6 +283,25 @@ func (r *Runner) generateSignedOutput(o *Output) (*SignedOutput, error) {
 
 	return &SignedOutput{
 		Data:      o,
+		Signer:    r.Operator.OperatorID,
+		Signature: sig,
+	}, nil
+}
+
+func (r *Runner) generateSignedOutputWithBlame(o *KeyGenOutcome) (*SignedOutput, error) {
+	blameData := &BlameData{
+		RequestID:    r.Identifier,
+		Valid:        o.BlameOutput.Valid,
+		BlameMessage: o.BlameOutput.BlameMessage,
+	}
+
+	sig, err := r.config.Signer.SignDKGOutput(blameData, r.Operator.ETHAddress)
+	if err != nil {
+		return nil, errors.Wrap(err, "could not sign output")
+	}
+
+	return &SignedOutput{
+		BlameData: blameData,
 		Signer:    r.Operator.OperatorID,
 		Signature: sig,
 	}, nil

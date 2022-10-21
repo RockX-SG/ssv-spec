@@ -10,11 +10,7 @@ type ProtocolMsg struct {
 	BlameMessage       *BlameMessage       `json:"blame,omitempty"`
 }
 
-func (msg *ProtocolMsg) validate(currentRound DKGRound) bool {
-	if msg.Round != currentRound {
-		return false
-	}
-
+func (msg *ProtocolMsg) validate() bool {
 	var messageExists bool
 	switch msg.Round {
 	case Preparation:
