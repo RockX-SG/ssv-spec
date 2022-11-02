@@ -206,62 +206,53 @@ func (test *FrostSpecTest) TestingFrostNodes(
 ) map[types.OperatorID]*dkg.Node {
 
 	nodes := make(map[types.OperatorID]*dkg.Node)
-
 	for _, operatorID := range test.Operators {
-
 		_, operator, _ := storage.GetDKGOperator(operatorID)
-		p := frost.New(network, operatorID, requestID, dkgsigner, storage)
-
 		node := dkg.NewNode(
 			operator,
 			&dkg.Config{
-				KeygenProtocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID, init *dkg.Init) dkg.Protocol {
-					return p
-				},
-				Network: network,
-				Storage: storage,
-				Signer:  dkgsigner,
+				KeygenProtocol: frost.New,
+				Network:        network,
+				Storage:        storage,
+				Signer:         dkgsigner,
 			})
 		nodes[operatorID] = node
 	}
 
 	if test.IsResharing {
-
 		operatorsOldList := types.OperatorList(test.OperatorsOld).ToUint32List()
 		keygenOutcomeOld := test.OldKeygenOutcomes.KeygenOutcome.ToKeygenOutcomeMap(test.Threshold, operatorsOldList)
 
 		for _, operatorID := range test.OperatorsOld {
+			storage := testingutils.NewTestingStorage()
+			_ = storage.SaveKeyGenOutput(keygenOutcomeOld[uint32(operatorID)])
 
 			_, operator, _ := storage.GetDKGOperator(operatorID)
-			p := frost.NewResharing(network, operatorID, requestID, dkgsigner, storage, keygenOutcomeOld[uint32(operatorID)], operatorsOldList[:test.Threshold+1])
-
-			node := dkg.NewNode(
+			node := dkg.NewResharingNode(
 				operator,
+				test.OperatorsOld,
 				&dkg.Config{
-					ReshareProtocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID, reshare *dkg.Reshare, output *dkg.KeyGenOutput) dkg.Protocol {
-						return p
-					},
-					Network: network,
-					Storage: storage,
-					Signer:  dkgsigner,
+					ReshareProtocol: frost.NewResharing,
+					Network:         network,
+					Storage:         storage,
+					Signer:          dkgsigner,
 				})
 			nodes[operatorID] = node
 		}
 
 		for _, operatorID := range test.Operators {
+			storage := testingutils.NewTestingStorage()
+			_ = storage.SaveKeyGenOutput(keygenOutcomeOld[operatorsOldList[0]])
 
 			_, operator, _ := storage.GetDKGOperator(operatorID)
-			p := frost.NewResharing(network, operatorID, requestID, dkgsigner, storage, nil, operatorsOldList[:test.Threshold+1])
-
-			node := dkg.NewNode(
+			node := dkg.NewResharingNode(
 				operator,
+				test.OperatorsOld,
 				&dkg.Config{
-					ReshareProtocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID, reshare *dkg.Reshare, output *dkg.KeyGenOutput) dkg.Protocol {
-						return p
-					},
-					Network: network,
-					Storage: storage,
-					Signer:  dkgsigner,
+					ReshareProtocol: frost.NewResharing,
+					Network:         network,
+					Storage:         storage,
+					Signer:          dkgsigner,
 				})
 			nodes[operatorID] = node
 		}

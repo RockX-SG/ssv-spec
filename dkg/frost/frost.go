@@ -96,6 +96,7 @@ func NewResharing(
 	requestID dkg.RequestID,
 	signer types.DKGSigner,
 	storage dkg.Storage,
+	oldOperators []types.OperatorID,
 	init *dkg.Reshare,
 	output *dkg.KeyGenOutput,
 ) dkg.Protocol {
@@ -106,7 +107,7 @@ func NewResharing(
 	msgs[Round2] = make(map[uint32]*dkg.SignedMessage)
 	msgs[Blame] = make(map[uint32]*dkg.SignedMessage)
 
-	operatorsOld := types.OperatorList(init.OldOperatorIDs).ToUint32List()
+	operatorsOld := types.OperatorList(oldOperators).ToUint32List()
 
 	return &FROST{
 		network: network,
@@ -135,7 +136,7 @@ func (fr *FROST) Start() error {
 	if _, err := rand.Read(ctx); err != nil {
 		return err
 	}
-	participant, err := frost.NewDkgParticipant(uint32(fr.state.operatorID), uint32(len(fr.state.operators)), string(ctx), thisCurve, fr.state.operators...)
+	participant, err := frost.NewDkgParticipant(uint32(fr.state.operatorID), fr.state.threshold, string(ctx), thisCurve, fr.state.operators...)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize a dkg participant")
 	}

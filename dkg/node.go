@@ -27,8 +27,9 @@ func (runners Runners) DeleteRunner(id RequestID) {
 type Node struct {
 	operator *Operator
 	// runners holds all active running DKG runners
-	runners Runners
-	config  *Config
+	operatorsOld []types.OperatorID
+	runners      Runners
+	config       *Config
 }
 
 func NewNode(operator *Operator, config *Config) *Node {
@@ -36,6 +37,15 @@ func NewNode(operator *Operator, config *Config) *Node {
 		operator: operator,
 		config:   config,
 		runners:  make(Runners, 0),
+	}
+}
+
+func NewResharingNode(operator *Operator, operatorsOld []types.OperatorID, config *Config) *Node {
+	return &Node{
+		operator:     operator,
+		operatorsOld: operatorsOld,
+		config:       config,
+		runners:      make(Runners, 0),
 	}
 }
 
@@ -48,7 +58,7 @@ func (n *Node) newRunner(id RequestID, initMsg *Init) (Runner, error) {
 		DepositDataRoot:       nil,
 		DepositDataSignatures: map[types.OperatorID]*PartialDepositData{},
 		OutputMsgs:            map[types.OperatorID]*SignedOutput{},
-		protocol:              n.config.KeygenProtocol(n.config.Network, n.operator.OperatorID, id, initMsg),
+		protocol:              n.config.KeygenProtocol(n.config.Network, n.operator.OperatorID, id, n.config.Signer, n.config.Storage, initMsg),
 		config:                n.config,
 	}
 
@@ -62,7 +72,7 @@ func (n *Node) newRunner(id RequestID, initMsg *Init) (Runner, error) {
 func (n *Node) newResharingRunner(id RequestID, reshareMsg *Reshare) (Runner, error) {
 	kgOutput, err := n.config.Storage.GetKeyGenOutput(reshareMsg.ValidatorPK)
 	if err != nil {
-		return nil, errors.Wrap(err, "could not find the ")
+		return nil, errors.Wrap(err, "could not find the keygen output from storage")
 	}
 	r := &runner{
 		Operator:              n.operator,
@@ -72,7 +82,7 @@ func (n *Node) newResharingRunner(id RequestID, reshareMsg *Reshare) (Runner, er
 		DepositDataRoot:       nil,
 		DepositDataSignatures: map[types.OperatorID]*PartialDepositData{},
 		OutputMsgs:            map[types.OperatorID]*SignedOutput{},
-		protocol:              n.config.ReshareProtocol(n.config.Network, n.operator.OperatorID, id, reshareMsg, kgOutput),
+		protocol:              n.config.ReshareProtocol(n.config.Network, n.operator.OperatorID, id, n.config.Signer, n.config.Storage, n.operatorsOld, reshareMsg, kgOutput),
 		config:                n.config,
 	}
 

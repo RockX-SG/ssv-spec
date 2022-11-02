@@ -160,8 +160,6 @@ type Reshare struct {
 	ValidatorPK types.ValidatorPK
 	// OperatorIDs are the operators in the new set
 	OperatorIDs []types.OperatorID
-	// OperatorIDs are the operators in the old set
-	OldOperatorIDs []types.OperatorID
 	// Threshold is the threshold of the new set
 	Threshold uint16
 }

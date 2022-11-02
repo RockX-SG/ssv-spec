@@ -11,7 +11,7 @@ func Keygen() *FrostSpecTest {
 	requestID := testingutils.GetRandRequestID()
 	ks := testingutils.Testing4SharesSet()
 
-	threshold := 2
+	threshold := 3
 	operators := []types.OperatorID{1, 2, 3, 4}
 	initMsgBytes := testingutils.InitMessageDataBytes(
 		operators,
@@ -41,18 +41,18 @@ func Keygen() *FrostSpecTest {
 
 		ExpectedOutcome: testingutils.TestOutcome{
 			KeygenOutcome: testingutils.TestKeygenOutcome{
-				ValidatorPK: "89a721d38bbcb78c396e61d7cf948b26432c72639bf343903b71989604e7df762c981c950ecd6567d79f98ed5eedb6b7",
+				ValidatorPK: "8ae6e5255472e548d039d5333001c66109c9896473d99c56f64f8e27da1bd8f645ec4e6a0c576b78c722896bce372812",
 				Share: map[uint32]string{
-					1: "02f026db6d82c36541076e8020955b658b435e592a03f70dce793d4c07694451",
-					2: "5d96593e5b076ee2b2ec7d2e7051790663b6af5d21d2263d47004ef7be6b9a9c",
-					3: "665bb970881643fd7881711a41017148b74063798e3375be47f4aaf585810e4b",
-					4: "130ed232fce2ddec6d64140ab534a159d52d246b132f4efe4ec4d2a581909e72",
+					1: "5365b83d582c9d1060830fa50a958df9f7e287e9860a70c97faab36a06be2912",
+					2: "533959ffa931481f392b2e86e203410fb1245436588db34dde389456dc0251b7",
+					3: "442f11f780536f53eda21438cda8c1835eccc54c4473d77b158d006f99044186",
+					4: "2646e024dd9312ae7de7c0bacd860f5500dbdb2b49bcdd5125a7f7b43dc3f87f",
 				},
 				OperatorPubKeys: map[uint32]string{
-					1: "a7fb41890fa546935608ccecf76521d5b6d68288a3f01dfe83e786b0a691705f6661e0aa9bd6a38bf76b1d0d85e344a1",
-					2: "894fa7ba56be2a3b9e565a166da3e3a4817f808d8b83e127acaba2a900d7abbfb33691cbda913dd30ca6b7e83dc9232b",
-					3: "b89f855865521dbd29b9f4e5306d11ef34bb8806a3a4b8e5d16c43946439c0483ba59b3d8bf2aa960151ff083c1cde29",
-					4: "928cc98f610158e532b2caba36a64a511009976393d0566833b45a48396af751bb9a8f79210fcca2eb8bb48bb708e98b",
+					1: "add523513d851787ec611256fe759e21ee4e84a684bc33224973a5481b202061bf383fac50319ce1f903207a71a4d8fa",
+					2: "8b9dfd049985f0aa84a8c309914df6752f32803c3b5590b279b1c24dba5b83f574ea6dba3038f55275d62a4f25a11cf5",
+					3: "b31e1a5da47be70788ebfdc4ec162b9dff1fe2d177af9187af41b472f10ecd0a90f9d9834be6103ce4690a36f25fe051",
+					4: "a9697dea52e229d8171a3051514df7a491e1228d8208f0561538e06f138dd37ddd6e0f7e3975cadf159bc2a02819d037",
 				},
 			},
 		},
