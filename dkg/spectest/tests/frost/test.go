@@ -54,10 +54,10 @@ func (test *FrostSpecTest) Run(t *testing.T) {
 	for _, operatorID := range test.Operators {
 
 		outcome := outcomes[uint32(operatorID)]
-		if outcome.KeyGenOutput != nil {
-			vk := hex.EncodeToString(outcome.KeyGenOutput.ValidatorPK)
-			sk := outcome.KeyGenOutput.Share.SerializeToHexStr()
-			pk := outcome.KeyGenOutput.OperatorPubKeys[operatorID].SerializeToHexStr()
+		if outcome.ProtocolOutput != nil {
+			vk := hex.EncodeToString(outcome.ProtocolOutput.ValidatorPK)
+			sk := outcome.ProtocolOutput.Share.SerializeToHexStr()
+			pk := outcome.ProtocolOutput.OperatorPubKeys[operatorID].SerializeToHexStr()
 
 			t.Logf("printing outcome keys for operatorID %d\n", operatorID)
 			t.Logf("vk %s\n", vk)
@@ -76,7 +76,7 @@ func (test *FrostSpecTest) Run(t *testing.T) {
 
 }
 
-func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.KeyGenOutcome, error) {
+func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.ProtocolOutcome, error) {
 
 	testingutils.ResetRandSeed()
 	dkgsigner := testingutils.NewTestingKeyManager()
@@ -162,12 +162,12 @@ func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.KeyGenOutcome, error)
 
 	}
 
-	ret := make(map[uint32]*dkg.KeyGenOutcome)
+	ret := make(map[uint32]*dkg.ProtocolOutcome)
 	outputs := nodes[test.Operators[0]].GetConfig().Network.(*testingutils.TestingNetwork).DKGOutputs
 
 	for operatorID, output := range outputs {
 		if output.BlameData != nil {
-			ret[uint32(operatorID)] = &dkg.KeyGenOutcome{
+			ret[uint32(operatorID)] = &dkg.ProtocolOutcome{
 				BlameOutput: &dkg.BlameOutput{
 					Valid:        output.BlameData.Valid,
 					BlameMessage: output.BlameData.BlameMessage,
@@ -183,8 +183,8 @@ func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.KeyGenOutcome, error)
 		sk := &bls.SecretKey{}
 		sk.Deserialize(share)
 
-		ret[uint32(operatorID)] = &dkg.KeyGenOutcome{
-			KeyGenOutput: &dkg.KeyGenOutput{
+		ret[uint32(operatorID)] = &dkg.ProtocolOutcome{
+			ProtocolOutput: &dkg.KeyGenOutput{
 				ValidatorPK: output.Data.ValidatorPubKey,
 				Share:       sk,
 				OperatorPubKeys: map[types.OperatorID]*bls.PublicKey{
@@ -215,7 +215,7 @@ func (test *FrostSpecTest) TestingFrostNodes(
 		node := dkg.NewNode(
 			operator,
 			&dkg.Config{
-				Protocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID) dkg.KeyGenProtocol {
+				KeygenProtocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID, init *dkg.Init) dkg.Protocol {
 					return p
 				},
 				Network: network,
@@ -238,7 +238,7 @@ func (test *FrostSpecTest) TestingFrostNodes(
 			node := dkg.NewNode(
 				operator,
 				&dkg.Config{
-					Protocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID) dkg.KeyGenProtocol {
+					ReshareProtocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID, reshare *dkg.Reshare, output *dkg.KeyGenOutput) dkg.Protocol {
 						return p
 					},
 					Network: network,
@@ -256,7 +256,7 @@ func (test *FrostSpecTest) TestingFrostNodes(
 			node := dkg.NewNode(
 				operator,
 				&dkg.Config{
-					Protocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID) dkg.KeyGenProtocol {
+					ReshareProtocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID, reshare *dkg.Reshare, output *dkg.KeyGenOutput) dkg.Protocol {
 						return p
 					},
 					Network: network,

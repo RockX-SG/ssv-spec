@@ -62,7 +62,8 @@ func New(
 	requestID dkg.RequestID,
 	signer types.DKGSigner,
 	storage dkg.Storage,
-) dkg.KeyGenProtocol {
+	init *dkg.Init,
+) dkg.Protocol {
 
 	msgs := make(map[DKGRound]map[uint32]*dkg.SignedMessage)
 	msgs[Preparation] = make(map[uint32]*dkg.SignedMessage)
@@ -70,19 +71,22 @@ func New(
 	msgs[Round2] = make(map[uint32]*dkg.SignedMessage)
 	msgs[Blame] = make(map[uint32]*dkg.SignedMessage)
 
-	return &FROST{
+	fr := &FROST{
 		network: network,
 		signer:  signer,
 		storage: storage,
 		state: &State{
-
 			identifier:     requestID,
 			operatorID:     operatorID,
+			threshold:      uint32(init.Threshold),
 			currentRound:   Uninitialized,
-			msgs:           msgs,
+			operators:      types.OperatorList(init.OperatorIDs).ToUint32List(),
 			operatorShares: make(map[uint32]*bls.SecretKey),
+			msgs:           msgs,
 		},
 	}
+
+	return fr
 }
 
 // Temporary, TODO: Remove and use interface with Reshare
@@ -92,9 +96,9 @@ func NewResharing(
 	requestID dkg.RequestID,
 	signer types.DKGSigner,
 	storage dkg.Storage,
-	oldKeyGenOutput *dkg.KeyGenOutput,
-	operatorsOld []uint32,
-) dkg.KeyGenProtocol {
+	init *dkg.Reshare,
+	output *dkg.KeyGenOutput,
+) dkg.Protocol {
 
 	msgs := make(map[DKGRound]map[uint32]*dkg.SignedMessage)
 	msgs[Preparation] = make(map[uint32]*dkg.SignedMessage)
@@ -102,59 +106,61 @@ func NewResharing(
 	msgs[Round2] = make(map[uint32]*dkg.SignedMessage)
 	msgs[Blame] = make(map[uint32]*dkg.SignedMessage)
 
+	operatorsOld := types.OperatorList(init.OldOperatorIDs).ToUint32List()
+
 	return &FROST{
 		network: network,
 		signer:  signer,
 		storage: storage,
 
 		state: &State{
-			msgs:            msgs,
 			identifier:      requestID,
 			operatorID:      operatorID,
+			threshold:       uint32(init.Threshold),
+			currentRound:    Uninitialized,
+			operators:       types.OperatorList(init.OperatorIDs).ToUint32List(),
 			operatorsOld:    operatorsOld,
-			oldKeyGenOutput: oldKeyGenOutput,
 			operatorShares:  make(map[uint32]*bls.SecretKey),
+			msgs:            msgs,
+			oldKeyGenOutput: output,
 		},
 	}
 }
 
 // TODO: If Reshare, confirm participating operators using qbft before kick-starting this process.
-func (fr *FROST) Start(init *dkg.Init) error {
-
+func (fr *FROST) Start() error {
 	fr.state.currentRound = Preparation
-	fr.state.threshold = uint32(init.Threshold)
-	fr.state.operators = types.OperatorList(init.OperatorIDs).ToUint32List()
 
 	ctx := make([]byte, 16)
 	if _, err := rand.Read(ctx); err != nil {
 		return err
 	}
-
 	participant, err := frost.NewDkgParticipant(uint32(fr.state.operatorID), uint32(len(fr.state.operators)), string(ctx), thisCurve, fr.state.operators...)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize a dkg participant")
 	}
 	fr.state.participant = participant
 
-	if fr.needToRunThisRound(Preparation) {
-		k, err := ecies.GenerateKey()
-		if err != nil {
-			return errors.Wrap(err, "failed to generate session sk")
-		}
-		fr.state.sessionSK = k
-		msg := &ProtocolMsg{
-			Round: fr.state.currentRound,
-			PreparationMessage: &PreparationMessage{
-				SessionPk: k.PublicKey.Bytes(true),
-			},
-		}
-		return fr.broadcastDKGMessage(msg)
+	if !fr.needToRunThisRound(Preparation) {
+		return nil
 	}
 
-	return nil
+	k, err := ecies.GenerateKey()
+	if err != nil {
+		return errors.Wrap(err, "failed to generate session sk")
+	}
+	fr.state.sessionSK = k
+
+	msg := &ProtocolMsg{
+		Round: fr.state.currentRound,
+		PreparationMessage: &PreparationMessage{
+			SessionPk: k.PublicKey.Bytes(true),
+		},
+	}
+	return fr.broadcastDKGMessage(msg)
 }
 
-func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, error) {
+func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.ProtocolOutcome, error) {
 
 	if err := fr.validateSignedMessage(msg); err != nil {
 		return false, nil, errors.Wrap(err, "failed to validate signed message")
@@ -180,7 +186,7 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 		if err != nil {
 			return false, nil, err
 		}
-		return true, &dkg.KeyGenOutcome{BlameOutput: out}, nil
+		return true, &dkg.ProtocolOutcome{BlameOutput: out}, nil
 	}
 
 	switch fr.state.currentRound {
@@ -197,7 +203,7 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 			fr.state.currentRound = Round2
 			if err := fr.processRound2(); err != nil {
 				if err.Error() == "invalid share" {
-					return true, &dkg.KeyGenOutcome{BlameOutput: err.(ErrInvalidShare).BlameOutput}, nil
+					return true, &dkg.ProtocolOutcome{BlameOutput: err.(ErrInvalidShare).BlameOutput}, nil
 				}
 				return false, nil, err
 			}
@@ -209,7 +215,7 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 			if err != nil {
 				return false, nil, err
 			}
-			return true, &dkg.KeyGenOutcome{KeyGenOutput: out}, nil
+			return true, &dkg.ProtocolOutcome{ProtocolOutput: out}, nil
 		}
 	default:
 		return true, nil, dkg.ErrInvalidRound{}

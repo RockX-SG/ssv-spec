@@ -47,7 +47,7 @@ func TestFrostDKG(t *testing.T) {
 	}
 
 	for _, operatorID := range operators {
-		output := outputs[uint32(operatorID)].KeyGenOutput
+		output := outputs[uint32(operatorID)].ProtocolOutput
 
 		require.Equal(t, expectedFrostOutput.ValidatorPK, hex.EncodeToString(output.ValidatorPK))
 		require.Equal(t, expectedFrostOutput.Share[uint32(operatorID)], output.Share.SerializeToHexStr())
@@ -78,23 +78,26 @@ var (
 func TestResharing(t *testing.T) {
 
 	operatorsOld := []types.OperatorID{
-		1, 2, 3, 4,
+		1, 2, 3, //4,
 	}
 
 	operators := []types.OperatorID{
 		5, 6, 7, 8,
 	}
 
-	outcomes, _ := TestingFrost(
+	outcomes, err := TestingFrost(
 		2,
 		operators,
 		operatorsOld,
 		true,
 		&expectedFrostOutput,
 	)
+	if err != nil {
+		t.Fatalf("failed to run frost: %s", err.Error())
+	}
 
 	for _, operatorID := range operators {
-		outcome := outcomes[uint32(operatorID)].KeyGenOutput
+		outcome := outcomes[uint32(operatorID)].ProtocolOutput
 
 		require.Equal(t, expectedResharingOutput.ValidatorPK, hex.EncodeToString(outcome.ValidatorPK))
 		require.Equal(t, expectedResharingOutput.Share[uint32(operatorID)], outcome.Share.SerializeToHexStr())
@@ -104,18 +107,27 @@ func TestResharing(t *testing.T) {
 	}
 }
 
-func TestingFrost(threshold uint64, operators, operatorsOld []types.OperatorID, isResharing bool, oldKeygenOutcomes *testingutils.TestKeygenOutcome) (map[uint32]*dkg.KeyGenOutcome, error) {
+func TestingFrost(
+	threshold uint64,
+	operators, operatorsOld []types.OperatorID,
+	isResharing bool,
+	oldKeygenOutcomes *testingutils.TestKeygenOutcome,
+) (map[uint32]*dkg.ProtocolOutcome, error) {
 
 	testingutils.ResetRandSeed()
-
 	requestID := testingutils.GetRandRequestID()
 	dkgsigner := testingutils.NewTestingKeyManager()
 	storage := testingutils.NewTestingStorage()
 	network := testingutils.NewTestingNetwork()
 
-	kgps := make(map[types.OperatorID]dkg.KeyGenProtocol)
+	init := &dkg.Init{
+		OperatorIDs: operators,
+		Threshold:   uint16(threshold),
+	}
+
+	kgps := make(map[types.OperatorID]dkg.Protocol)
 	for _, operatorID := range operators {
-		p := New(network, operatorID, requestID, dkgsigner, storage)
+		p := New(network, operatorID, requestID, dkgsigner, storage, init)
 		kgps[operatorID] = p
 	}
 
@@ -123,14 +135,21 @@ func TestingFrost(threshold uint64, operators, operatorsOld []types.OperatorID, 
 		operatorsOldList := types.OperatorList(operatorsOld).ToUint32List()
 		keygenOutcomeOld := oldKeygenOutcomes.ToKeygenOutcomeMap(threshold, operatorsOldList)
 
+		reshare := &dkg.Reshare{
+			ValidatorPK:    keygenOutcomeOld[operatorsOldList[0]].ValidatorPK,
+			OperatorIDs:    operators,
+			OldOperatorIDs: operatorsOld,
+			Threshold:      uint16(threshold),
+		}
+
 		for _, operatorID := range operatorsOld {
-			p := NewResharing(network, operatorID, requestID, dkgsigner, storage, keygenOutcomeOld[uint32(operatorID)], operatorsOldList[:threshold+1])
+			p := NewResharing(network, operatorID, requestID, dkgsigner, storage, reshare, keygenOutcomeOld[uint32(operatorID)])
 			kgps[operatorID] = p
 
 		}
 
 		for _, operatorID := range operators {
-			p := NewResharing(network, operatorID, requestID, dkgsigner, storage, nil, operatorsOldList[:threshold+1])
+			p := NewResharing(network, operatorID, requestID, dkgsigner, storage, reshare, nil)
 			kgps[operatorID] = p
 		}
 	}
@@ -140,18 +159,13 @@ func TestingFrost(threshold uint64, operators, operatorsOld []types.OperatorID, 
 		alloperators = append(alloperators, operatorsOld...)
 	}
 
-	initMsg := &dkg.Init{
-		OperatorIDs: operators,
-		Threshold:   uint16(threshold),
-	}
-
 	for _, operatorID := range alloperators {
-		if err := kgps[operatorID].Start(initMsg); err != nil {
+		if err := kgps[operatorID].Start(); err != nil {
 			return nil, errors.Wrapf(err, "failed to start dkg protocol for operator %d", operatorID)
 		}
 	}
 
-	outcomes := make(map[uint32]*dkg.KeyGenOutcome)
+	outcomes := make(map[uint32]*dkg.ProtocolOutcome)
 	for i := 0; i < 3; i++ {
 
 		messages := network.BroadcastedMsgs
