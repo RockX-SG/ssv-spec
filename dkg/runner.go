@@ -126,8 +126,6 @@ func (r *runner) ProcessMsg(msg *SignedMessage) (bool, error) {
 	default:
 		return false, errors.New("msg type invalid")
 	}
-
-	return false, nil
 }
 
 func (r *runner) prepareAndBroadcastDepositData() error {
