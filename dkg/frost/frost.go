@@ -234,7 +234,7 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.ProtocolOutcome,
 
 func (fr *FROST) canProceedThisRound() bool {
 
-	// Preparation (N) -> Round1 (O) -> Round2 (N)
+	// For resharing: Preparation (New Committee) -> Round1 (Old Committee) -> Round2 (New Committee)
 	switch fr.state.currentRound {
 	case Preparation:
 		return fr.allMessagesReceivedFor(Preparation, fr.state.operators)
@@ -282,7 +282,7 @@ func (fr *FROST) inNewCommittee() bool {
 }
 
 func (fr *FROST) needToRunThisRound(thisRound DKGRound) bool {
-	// If new keygen, every round need to run
+	// If new keygen, every round needs to run
 	if !fr.isResharing() {
 		return true
 	}
