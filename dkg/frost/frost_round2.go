@@ -58,8 +58,19 @@ func (fr *FROST) processRound2() error {
 
 		p2psend[operatorID] = share
 
-		if err := verifiers.Verify(share); err != nil {
-			return fr.createAndBroadcastBlameOfInvalidShare(operatorID)
+		err = verifiers.Verify(share)
+		if err != nil {
+			err2 := fr.createAndBroadcastBlameOfInvalidShare(operatorID)
+			if err2 != nil {
+				return err2
+			}
+
+			blameOutput, err2 := fr.processBlame()
+			if err2 != nil {
+				return err2
+			}
+
+			return ErrInvalidShare{BlameOutput: blameOutput}
 		}
 	}
 

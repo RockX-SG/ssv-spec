@@ -1,32 +1,65 @@
 package frost
 
 import (
+	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
 )
 
 func Keygen() *FrostSpecTest {
+
+	requestID := testingutils.GetRandRequestID()
+	ks := testingutils.Testing4SharesSet()
+
+	threshold := 3
+	operators := []types.OperatorID{1, 2, 3, 4}
+	initMsgBytes := testingutils.InitMessageDataBytes(
+		operators,
+		uint16(threshold),
+		testingutils.TestingWithdrawalCredentials,
+		testingutils.TestingForkVersion,
+	)
+
+	initMessages := make(map[uint32][]*dkg.SignedMessage)
+	for _, operatorID := range operators {
+		initMessages[uint32(operatorID)] = []*dkg.SignedMessage{
+			testingutils.SignDKGMsg(ks.DKGOperators[operatorID].SK, operatorID, &dkg.Message{
+				MsgType:    dkg.InitMsgType,
+				Identifier: requestID,
+				Data:       initMsgBytes,
+			}),
+		}
+	}
+
 	return &FrostSpecTest{
-		Name: "Simple Keygen",
+		Name:   "Simple Keygen",
+		Keyset: ks,
 
-		Threshold: 2,
-		Operators: []types.OperatorID{1, 2, 3, 4},
+		RequestID: requestID,
+		Threshold: uint64(threshold),
+		Operators: operators,
 
-		ExpectedOutcome: testingutils.TestKeygenOutcome{
-			ValidatorPK: "84d633334d8d615d6739d1f011f2c9b194601e38213937999868ed9b016cab8500e16319a2866ed853411ce1628e84b3",
-			Share: map[uint32]string{
-				1: "285a26f43b026b246ca0c33b34aaf90890c016d943a75456efbe00d4d0bdee01",
-				2: "1d3701ab6e7b902bd482ac899ec7bab1852376ae234474bae1a3f83bb41dc48f",
-				3: "42afa077e46dd25be4d7bb5be8734e77df5f074e0933f6ef6af8bdbe3e205cd0",
-				4: "67c262ae06e14097b7b3e5a1a36526d6640ac899407bf61fd38c3490e43afed4",
-			},
-			OperatorPubKeys: map[uint32]string{
-				1: "960498d1f66481d570b80c2cb6fbafa40a250f46510412eb51abaf1b62aa17e747c8c40f69d01606cd29dd0466f4a9a2",
-				2: "a73f10841b40509f3a727a3311c77ee46ce0ae43ffdbd44aca87f837e392772834f51d1b38eacbe91d21057c0717a51b",
-				3: "8982bd51c3a08d8eb0d470eeb57fe3a8a8db4f426026019bf27a5faa745fc13bc75e3e2bea2435f47fa9148313959000",
-				4: "af4ce0c5ec16cc0d52acb5419d8b51051bcb271275680ab17c3a445d4de3c661971f19786667ab60216955bf20a13ea7",
+		ExpectedOutcome: testingutils.TestOutcome{
+			KeygenOutcome: testingutils.TestKeygenOutcome{
+				ValidatorPK: "8ae6e5255472e548d039d5333001c66109c9896473d99c56f64f8e27da1bd8f645ec4e6a0c576b78c722896bce372812",
+				Share: map[uint32]string{
+					1: "5365b83d582c9d1060830fa50a958df9f7e287e9860a70c97faab36a06be2912",
+					2: "533959ffa931481f392b2e86e203410fb1245436588db34dde389456dc0251b7",
+					3: "442f11f780536f53eda21438cda8c1835eccc54c4473d77b158d006f99044186",
+					4: "2646e024dd9312ae7de7c0bacd860f5500dbdb2b49bcdd5125a7f7b43dc3f87f",
+				},
+				OperatorPubKeys: map[uint32]string{
+					1: "add523513d851787ec611256fe759e21ee4e84a684bc33224973a5481b202061bf383fac50319ce1f903207a71a4d8fa",
+					2: "8b9dfd049985f0aa84a8c309914df6752f32803c3b5590b279b1c24dba5b83f574ea6dba3038f55275d62a4f25a11cf5",
+					3: "b31e1a5da47be70788ebfdc4ec162b9dff1fe2d177af9187af41b472f10ecd0a90f9d9834be6103ce4690a36f25fe051",
+					4: "a9697dea52e229d8171a3051514df7a491e1228d8208f0561538e06f138dd37ddd6e0f7e3975cadf159bc2a02819d037",
+				},
 			},
 		},
 		ExpectedError: "",
+
+		InputMessages: map[int]MessagesForNodes{
+			0: initMessages,
+		},
 	}
 }

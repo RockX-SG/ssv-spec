@@ -54,12 +54,12 @@ func (fr *FROST) verifyShares() ([]*bls.G1, error) {
 
 	outputs := make([]*bls.G1, 0)
 
-	for j := int(fr.state.threshold + 1); j < len(fr.state.operators); j++ {
+	for j := int(fr.state.threshold); j < len(fr.state.operators); j++ {
 
 		xVec := make([]bls.Fr, 0)
 		yVec := make([]bls.G1, 0)
 
-		for i := j - int(fr.state.threshold+1); i < j; i++ {
+		for i := j - int(fr.state.threshold); i < j; i++ {
 			operatorID := fr.state.operators[i]
 
 			protocolMessage := &ProtocolMsg{}
@@ -90,7 +90,7 @@ func (fr *FROST) verifyShares() ([]*bls.G1, error) {
 
 	for i := 1; i < len(outputs); i++ {
 		if !outputs[i].IsEqual(outputs[i-1]) {
-			return nil, errors.New("failed to create consistent public key from t+1 shares")
+			return nil, errors.New("failed to create consistent public key from tshares")
 		}
 	}
 

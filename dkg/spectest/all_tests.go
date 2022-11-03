@@ -17,4 +17,6 @@ var AllTests = []SpecTest{
 
 	frost.Keygen(),
 	frost.Resharing(),
+	// frost.BlameTypeInvalidShare(),
+	tests.ResharingHappyFlow(),
 }

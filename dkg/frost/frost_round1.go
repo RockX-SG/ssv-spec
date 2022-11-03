@@ -67,8 +67,8 @@ func (fr *FROST) partialInterpolate() ([]byte, error) {
 
 	skI := new(bls.Fr)
 
-	indices := make([]bls.Fr, fr.state.oldKeyGenOutput.Threshold+1)
-	values := make([]bls.Fr, fr.state.oldKeyGenOutput.Threshold+1)
+	indices := make([]bls.Fr, fr.state.oldKeyGenOutput.Threshold)
+	values := make([]bls.Fr, fr.state.oldKeyGenOutput.Threshold)
 	for i, id := range fr.state.operatorsOld {
 		(&indices[i]).SetInt64(int64(id))
 		if types.OperatorID(id) == fr.state.operatorID {
