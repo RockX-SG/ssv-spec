@@ -31,10 +31,6 @@ func (fr *FROST) processBlame() (*dkg.BlameOutput, error) {
 			valid, _ = fr.processBlameTypeInconsistentMessage(operatorID, protocolMessage.BlameMessage)
 		}
 
-		// if err != nil {
-		// 	return nil, err
-		// }
-
 		serializedSigneMessage, err := msg.Encode()
 		if err != nil {
 			return nil, err
@@ -135,7 +131,7 @@ func (fr *FROST) processBlameTypeInconsistentMessage(operatorID uint32, blameMes
 		return false, errors.New("the message doesn't belong to this session")
 	}
 
-	if originalMessage.Message.Identifier == newMessage.Message.Identifier {
+	if originalMessage.Message.Identifier != newMessage.Message.Identifier {
 		return false, errors.New("the two messages don't belong to same session")
 	}
 
@@ -213,7 +209,7 @@ func (fr *FROST) haveSameRoot(originalMessage, newMessage *dkg.SignedMessage) bo
 	if err != nil {
 		return false
 	}
-	return !bytes.Equal(r1, r2)
+	return bytes.Equal(r1, r2)
 }
 
 type ErrInvalidShare struct {

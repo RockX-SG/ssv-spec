@@ -126,12 +126,14 @@ func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.ProtocolOutcome, *dkg
 			}
 
 			msgsToBroadcast := []*types.SSVMessage{}
-			if testMessage, ok := test.InputMessages[round][uint32(dkgMsg.Signer)]; ok {
-				testMessageBytes, _ := testMessage[0].Encode()
-				msgsToBroadcast = append(msgsToBroadcast, &types.SSVMessage{
-					MsgType: msg.MsgType,
-					Data:    testMessageBytes,
-				})
+			if testMessages, ok := test.InputMessages[round][uint32(dkgMsg.Signer)]; ok {
+				for _, testMessage := range testMessages {
+					testMessageBytes, _ := testMessage.Encode()
+					msgsToBroadcast = append(msgsToBroadcast, &types.SSVMessage{
+						MsgType: msg.MsgType,
+						Data:    testMessageBytes,
+					})
+				}
 			} else {
 				msgsToBroadcast = append(msgsToBroadcast, msg)
 			}

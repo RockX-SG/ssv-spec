@@ -184,7 +184,17 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.ProtocolOutcome,
 
 	originalMessage, ok := fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)]
 	if ok && !fr.haveSameRoot(originalMessage, msg) {
-		return false, nil, fr.createAndBroadcastBlameOfInconsistentMessage(originalMessage, msg)
+
+		err := fr.createAndBroadcastBlameOfInconsistentMessage(originalMessage, msg)
+		if err != nil {
+			return false, nil, err
+		}
+
+		out, err := fr.processBlame()
+		if err != nil {
+			return false, nil, err
+		}
+		return true, &dkg.ProtocolOutcome{BlameOutput: out}, nil
 	}
 
 	fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)] = msg
@@ -335,9 +345,9 @@ func (fr *FROST) validateProtocolMessage(msg *ProtocolMsg) error {
 		return nil
 	}
 
-	if msg.Round != fr.state.currentRound {
-		return dkg.ErrMismatchRound{}
-	}
+	// if msg.Round != fr.state.currentRound {
+	// 	return dkg.ErrMismatchRound{}
+	// }
 
 	if valid := msg.validate(); !valid {
 		return errors.New("invalid message")
