@@ -43,12 +43,17 @@ func (test *FrostSpecTest) TestName() string {
 
 func (test *FrostSpecTest) Run(t *testing.T) {
 
-	outcomes, err := test.TestingFrost()
+	outcomes, blame, err := test.TestingFrost()
 
 	if len(test.ExpectedError) > 0 {
 		require.EqualError(t, err, test.ExpectedError)
 	} else {
 		require.NoError(t, err)
+	}
+
+	if blame != nil {
+		require.Equal(t, test.ExpectedOutcome.BlameOutcome.Valid, blame.Valid)
+		return
 	}
 
 	for _, operatorID := range test.Operators {
@@ -68,15 +73,10 @@ func (test *FrostSpecTest) Run(t *testing.T) {
 			require.Equal(t, test.ExpectedOutcome.KeygenOutcome.Share[uint32(operatorID)], sk)
 			require.Equal(t, test.ExpectedOutcome.KeygenOutcome.OperatorPubKeys[uint32(operatorID)], pk)
 		}
-
-		if outcome.BlameOutput != nil {
-			require.Equal(t, test.ExpectedOutcome.BlameOutcome.Valid, outcome.BlameOutput.Valid)
-		}
 	}
-
 }
 
-func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.ProtocolOutcome, error) {
+func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.ProtocolOutcome, *dkg.BlameOutput, error) {
 
 	testingutils.ResetRandSeed()
 	dkgsigner := testingutils.NewTestingKeyManager()
@@ -97,7 +97,7 @@ func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.ProtocolOutcome, erro
 
 	initMessages, exists := test.InputMessages[0]
 	if !exists {
-		return nil, errors.New("init messages not found in spec")
+		return nil, nil, errors.New("init messages not found in spec")
 	}
 
 	for operatorID, messages := range initMessages {
@@ -109,7 +109,7 @@ func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.ProtocolOutcome, erro
 				Data:    messageBytes,
 			}
 			if err := nodes[types.OperatorID(operatorID)].ProcessMessage(startMessage); err != nil {
-				return nil, errors.Wrapf(err, "failed to start dkg protocol for operator %d", operatorID)
+				return nil, nil, errors.Wrapf(err, "failed to start dkg protocol for operator %d", operatorID)
 			}
 		}
 	}
@@ -118,12 +118,11 @@ func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.ProtocolOutcome, erro
 
 		messages := network.BroadcastedMsgs
 		network.BroadcastedMsgs = make([]*types.SSVMessage, 0)
-
 		for _, msg := range messages {
 
 			dkgMsg := &dkg.SignedMessage{}
 			if err := dkgMsg.Decode(msg.Data); err != nil {
-				return nil, err
+				return nil, nil, err
 			}
 
 			msgsToBroadcast := []*types.SSVMessage{}
@@ -154,7 +153,7 @@ func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.ProtocolOutcome, erro
 
 				for _, msgToBroadcast := range msgsToBroadcast {
 					if err := nodes[operatorID].ProcessMessage(msgToBroadcast); err != nil {
-						return nil, err
+						return nil, nil, err
 					}
 				}
 			}
@@ -163,7 +162,12 @@ func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.ProtocolOutcome, erro
 	}
 
 	ret := make(map[uint32]*dkg.ProtocolOutcome)
-	outputs := nodes[test.Operators[0]].GetConfig().Network.(*testingutils.TestingNetwork).DKGOutputs
+
+	outputs := network.DKGOutputs
+	blame := network.BlameOutput
+	if blame != nil {
+		return nil, blame, nil
+	}
 
 	for operatorID, output := range outputs {
 		if output.BlameData != nil {
@@ -195,7 +199,7 @@ func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.ProtocolOutcome, erro
 		}
 	}
 
-	return ret, nil
+	return ret, nil, nil
 }
 
 func (test *FrostSpecTest) TestingFrostNodes(
