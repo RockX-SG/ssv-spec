@@ -28,6 +28,16 @@ type FROST struct {
 	state *State
 }
 
+type ProtocolMessageStore map[DKGRound]map[uint32]*dkg.SignedMessage
+
+func newProtocolMessageStore() ProtocolMessageStore {
+	m := make(map[DKGRound]map[uint32]*dkg.SignedMessage)
+	for _, round := range dkgRounds {
+		m[round] = make(map[uint32]*dkg.SignedMessage)
+	}
+	return m
+}
+
 type State struct {
 	identifier dkg.RequestID
 	operatorID types.OperatorID
@@ -41,7 +51,7 @@ type State struct {
 	operatorsOld   []uint32
 	operatorShares map[uint32]*bls.SecretKey
 
-	msgs            map[DKGRound]map[uint32]*dkg.SignedMessage
+	msgs            ProtocolMessageStore
 	oldKeyGenOutput *dkg.KeyGenOutput
 }
 
@@ -56,6 +66,15 @@ const (
 	Blame
 )
 
+var dkgRounds = []DKGRound{
+	Uninitialized,
+	Preparation,
+	Round1,
+	Round2,
+	KeygenOutput,
+	Blame,
+}
+
 func New(
 	network dkg.Network,
 	operatorID types.OperatorID,
@@ -64,12 +83,6 @@ func New(
 	storage dkg.Storage,
 	init *dkg.Init,
 ) dkg.Protocol {
-
-	msgs := make(map[DKGRound]map[uint32]*dkg.SignedMessage)
-	msgs[Preparation] = make(map[uint32]*dkg.SignedMessage)
-	msgs[Round1] = make(map[uint32]*dkg.SignedMessage)
-	msgs[Round2] = make(map[uint32]*dkg.SignedMessage)
-	msgs[Blame] = make(map[uint32]*dkg.SignedMessage)
 
 	fr := &FROST{
 		network: network,
@@ -82,7 +95,7 @@ func New(
 			currentRound:   Uninitialized,
 			operators:      types.OperatorList(init.OperatorIDs).ToUint32List(),
 			operatorShares: make(map[uint32]*bls.SecretKey),
-			msgs:           msgs,
+			msgs:           newProtocolMessageStore(),
 		},
 	}
 
@@ -101,12 +114,6 @@ func NewResharing(
 	output *dkg.KeyGenOutput,
 ) dkg.Protocol {
 
-	msgs := make(map[DKGRound]map[uint32]*dkg.SignedMessage)
-	msgs[Preparation] = make(map[uint32]*dkg.SignedMessage)
-	msgs[Round1] = make(map[uint32]*dkg.SignedMessage)
-	msgs[Round2] = make(map[uint32]*dkg.SignedMessage)
-	msgs[Blame] = make(map[uint32]*dkg.SignedMessage)
-
 	operatorsOld := types.OperatorList(oldOperators).ToUint32List()
 
 	return &FROST{
@@ -122,7 +129,7 @@ func NewResharing(
 			operators:       types.OperatorList(init.OperatorIDs).ToUint32List(),
 			operatorsOld:    operatorsOld,
 			operatorShares:  make(map[uint32]*bls.SecretKey),
-			msgs:            msgs,
+			msgs:            newProtocolMessageStore(),
 			oldKeyGenOutput: output,
 		},
 	}
