@@ -276,9 +276,8 @@ func (fr *FROST) inNewCommittee() bool {
 }
 
 func (fr *FROST) needToRunCurrentRound() bool {
-	// If new keygen, every round needs to run
 	if !fr.isResharing() {
-		return true
+		return true // always run for new keygen
 	}
 	switch fr.state.currentRound {
 	case Preparation, Round2, KeygenOutput:
@@ -321,7 +320,6 @@ func (fr *FROST) validateSignedMessage(msg *dkg.SignedMessage) error {
 }
 
 func (fr *FROST) encryptByOperatorID(operatorID uint32, data []byte) ([]byte, error) {
-
 	msg, ok := fr.state.msgs[Preparation][operatorID]
 	if !ok {
 		return nil, errors.New("no session pk found for the operator")
@@ -341,7 +339,6 @@ func (fr *FROST) encryptByOperatorID(operatorID uint32, data []byte) ([]byte, er
 }
 
 func (fr *FROST) toSignedMessage(msg *ProtocolMsg) (*dkg.SignedMessage, error) {
-
 	msgBytes, err := msg.Encode()
 	if err != nil {
 		return nil, err
@@ -369,7 +366,6 @@ func (fr *FROST) toSignedMessage(msg *ProtocolMsg) (*dkg.SignedMessage, error) {
 		return nil, err
 	}
 	bcastMessage.Signature = sig
-
 	return bcastMessage, nil
 }
 
@@ -378,11 +374,6 @@ func (fr *FROST) broadcastDKGMessage(msg *ProtocolMsg) error {
 	if err != nil {
 		return err
 	}
-
-	if msg.Round == Blame {
-		fr.state.msgs[Blame][uint32(fr.state.operatorID)] = bcastMessage
-	} else {
-		fr.state.msgs[fr.state.currentRound][uint32(fr.state.operatorID)] = bcastMessage
-	}
+	fr.state.msgs[fr.state.currentRound][uint32(fr.state.operatorID)] = bcastMessage
 	return fr.network.BroadcastDKGMessage(bcastMessage)
 }
