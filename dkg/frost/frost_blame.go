@@ -153,27 +153,22 @@ func (fr *FROST) processBlameTypeInconsistentMessage(operatorID uint32, blameMes
 	return true, nil
 }
 
-func (fr *FROST) createAndBroadcastBlameOfInconsistentMessage(originalMessage, newMessage *dkg.SignedMessage) error {
-
-	originalMessageBytes, err := originalMessage.Encode()
+func (fr *FROST) createAndBroadcastBlameOfInconsistentMessage(existingMessage, newMessage *dkg.SignedMessage) error {
+	fr.state.currentRound = Blame
+	existingMessageBytes, err := existingMessage.Encode()
 	if err != nil {
 		return err
 	}
-
 	newMessageBytes, err := newMessage.Encode()
 	if err != nil {
 		return err
 	}
-
-	blameData := make([][]byte, 0)
-	blameData = append(blameData, originalMessageBytes, newMessageBytes)
-
 	msg := &ProtocolMsg{
 		Round: Blame,
 		BlameMessage: &BlameMessage{
 			Type:             InconsistentMessage,
 			TargetOperatorID: uint32(newMessage.Signer),
-			BlameData:        blameData,
+			BlameData:        [][]byte{existingMessageBytes, newMessageBytes},
 			BlamerSessionSk:  fr.state.sessionSK.Bytes(),
 		},
 	}
@@ -181,27 +176,25 @@ func (fr *FROST) createAndBroadcastBlameOfInconsistentMessage(originalMessage, n
 }
 
 func (fr *FROST) createAndBroadcastBlameOfInvalidShare(operatorID uint32) error {
-
+	fr.state.currentRound = Blame
 	round1Bytes, err := fr.state.msgs[Round1][operatorID].Encode()
 	if err != nil {
 		return err
 	}
-	blameData := [][]byte{round1Bytes}
-
 	msg := &ProtocolMsg{
 		Round: Blame,
 		BlameMessage: &BlameMessage{
 			Type:             InvalidShare,
 			TargetOperatorID: operatorID,
-			BlameData:        blameData,
+			BlameData:        [][]byte{round1Bytes},
 			BlamerSessionSk:  fr.state.sessionSK.Bytes(),
 		},
 	}
 	return fr.broadcastDKGMessage(msg)
 }
 
-func (fr *FROST) haveSameRoot(originalMessage, newMessage *dkg.SignedMessage) bool {
-	r1, err := originalMessage.GetRoot()
+func (fr *FROST) haveSameRoot(existingMessage, newMessage *dkg.SignedMessage) bool {
+	r1, err := existingMessage.GetRoot()
 	if err != nil {
 		return false
 	}

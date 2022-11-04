@@ -7,7 +7,7 @@ import (
 
 func (fr *FROST) processRound1() error {
 
-	if !fr.needToRunThisRound(Round1) {
+	if !fr.needToRunCurrentRound() {
 		return fr.state.participant.SkipRound1()
 	}
 

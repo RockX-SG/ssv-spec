@@ -2,6 +2,7 @@ package frost
 
 import (
 	"bytes"
+
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/herumi/bls-eth-go-binary/bls"
@@ -10,7 +11,7 @@ import (
 
 func (fr *FROST) processKeygenOutput() (*dkg.KeyGenOutput, error) {
 
-	if !fr.needToRunThisRound(KeygenOutput) {
+	if !fr.needToRunCurrentRound() {
 		return nil, nil
 	}
 

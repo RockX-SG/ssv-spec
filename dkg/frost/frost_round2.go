@@ -9,7 +9,7 @@ import (
 
 func (fr *FROST) processRound2() error {
 
-	if !fr.needToRunThisRound(Round2) {
+	if !fr.needToRunCurrentRound() {
 		return nil
 	}
 
