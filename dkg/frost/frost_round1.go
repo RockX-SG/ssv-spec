@@ -11,9 +11,16 @@ func (fr *FROST) processRound1() error {
 		return fr.state.participant.SkipRound1()
 	}
 
-	skI, err := fr.partialInterpolate()
-	if err != nil {
-		return err
+	var (
+		skI []byte // secret to be shared, nil if new keygen, lagrange interpolation of own part of secret if resharing
+		err error
+	)
+
+	if fr.isResharing() {
+		skI, err = fr.partialInterpolate()
+		if err != nil {
+			return err
+		}
 	}
 
 	bCastMessage, p2pMessages, err := fr.state.participant.Round1(skI)
@@ -21,11 +28,13 @@ func (fr *FROST) processRound1() error {
 		return err
 	}
 
+	// get bytes representation of commitment points
 	commitments := make([][]byte, 0)
 	for _, commitment := range bCastMessage.Verifiers.Commitments {
 		commitments = append(commitments, commitment.ToAffineCompressed())
 	}
 
+	// encrypted shares by operators
 	shares := make(map[uint32][]byte)
 	for _, operatorID := range fr.state.operators {
 		if uint32(fr.state.operatorID) == operatorID {

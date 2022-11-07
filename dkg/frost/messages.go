@@ -52,10 +52,14 @@ func (msg *PreparationMessage) Decode(data []byte) error {
 }
 
 type Round1Message struct {
+	// Commitment bytes representation of commitment points to pre-selected polynomials
 	Commitment [][]byte
-	ProofS     []byte
-	ProofR     []byte
-	Shares     map[uint32][]byte
+	// ProofS the S value of the Schnorr's proof
+	ProofS []byte
+	// ProofR the R value of the Schnorr's proof
+	ProofR []byte
+	// Shares the encrypted shares by operator
+	Shares map[uint32][]byte
 }
 
 // Encode returns a msg encoded bytes or error
