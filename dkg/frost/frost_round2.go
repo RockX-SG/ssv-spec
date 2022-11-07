@@ -32,8 +32,14 @@ func (fr *FROST) processRound2() error {
 			verifiers.Commitments = append(verifiers.Commitments, commitment)
 		}
 
-		Wi, _ := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofS)
-		Ci, _ := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofR)
+		Wi, err := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofS)
+		if err != nil {
+			return err
+		}
+		Ci, err := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofR)
+		if err != nil {
+			return err
+		}
 
 		bcastMessage := &frost.Round1Bcast{
 			Verifiers: verifiers,
