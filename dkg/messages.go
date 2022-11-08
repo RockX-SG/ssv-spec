@@ -133,13 +133,26 @@ func (msg *Init) Validate() error {
 	if len(msg.WithdrawalCredentials) != phase0.HashLength {
 		return errors.New("invalid WithdrawalCredentials")
 	}
-	if len(msg.OperatorIDs) < 4 || (len(msg.OperatorIDs)-1)%3 != 0 {
+	contains := func(container []int, elem int) bool {
+		for _, n := range container {
+			if elem == n {
+				return true
+			}
+		}
+		return false
+	}
+	validSizes := []int{4, 7, 10, 13}
+	validN := contains(validSizes, len(msg.OperatorIDs))
+
+	if !validN {
 		return errors.New("invalid number of operators which has to be 3f+1")
 	}
 
-	// if int(msg.Threshold) != (len(msg.OperatorIDs)-1)*2/3+1 {
-	// 	return errors.New("invalid threshold which has to be 2f+1")
-	// }
+	f := len(msg.OperatorIDs) / 3
+
+	if int(msg.Threshold) != (2*f + 1) {
+		return errors.New("invalid threshold which has to be 2f+1")
+	}
 
 	return nil
 }
