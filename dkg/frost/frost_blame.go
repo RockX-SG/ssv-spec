@@ -31,6 +31,8 @@ func (fr *FROST) processBlame() (*dkg.BlameOutput, error) {
 			valid, _ = fr.processBlameTypeInconsistentMessage(operatorID, protocolMessage.BlameMessage)
 		case FailedEcies:
 			valid, _ = fr.processBlameTypeFailedEcies(operatorID, protocolMessage.BlameMessage)
+		case InvalidScaler:
+			valid, _ = fr.processBlameTypeInvalidScaler(operatorID, protocolMessage.BlameMessage)
 		}
 
 		serializedSigneMessage, err := msg.Encode()
@@ -179,6 +181,21 @@ func (fr *FROST) processBlameTypeFailedEcies(operatorID uint32, blameMessage *Bl
 	return true, nil
 }
 
+func (fr *FROST) processBlameTypeInvalidScaler(operatorID uint32, blameMessage *BlameMessage) (bool /*valid*/, error) {
+
+	if len(blameMessage.BlameData) != 2 {
+		return false, errors.New("invalid blame data")
+	}
+
+	_, err := thisCurve.Scalar.SetBytes(blameMessage.BlameData[0] /* scaler i.e ProofR or ProofS */)
+	if err == nil {
+		return false, errors.New("given scaler is valid")
+	} else if err.Error() != string(blameMessage.BlameData[1] /* err string */) {
+		return false, errors.New("unexpected error")
+	}
+	return true, nil
+}
+
 func (fr *FROST) createAndBroadcastBlameOfInconsistentMessage(existingMessage, newMessage *dkg.SignedMessage) error {
 	existingMessageBytes, err := existingMessage.Encode()
 	if err != nil {
@@ -224,6 +241,19 @@ func (fr *FROST) createAndBroadcastBlameOfFailedEcies(operatorID uint32, encrypt
 			Type:             FailedEcies,
 			TargetOperatorID: operatorID,
 			BlameData:        [][]byte{encryptedShare, err},
+			BlamerSessionSk:  fr.state.sessionSK.Bytes(),
+		},
+	}
+	return fr.broadcastDKGMessage(msg)
+}
+
+func (fr *FROST) createAndBroadcastBlameOfInvalidScaler(operatorID uint32, scaler []byte, err []byte) error {
+	msg := &ProtocolMsg{
+		Round: Blame,
+		BlameMessage: &BlameMessage{
+			Type:             InvalidScaler,
+			TargetOperatorID: operatorID,
+			BlameData:        [][]byte{scaler, err},
 			BlamerSessionSk:  fr.state.sessionSK.Bytes(),
 		},
 	}

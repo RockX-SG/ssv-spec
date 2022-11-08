@@ -103,4 +103,6 @@ const (
 	InvalidShare
 	// FailedEcies refers to failing of decryption of encrypted share using ecies
 	FailedEcies
+	// InvalidScaler refers to sending invalid scaler values for ProofS & ProofR
+	InvalidScaler
 )

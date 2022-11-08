@@ -34,11 +34,29 @@ func (fr *FROST) processRound2() error {
 
 		Wi, err := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofS)
 		if err != nil {
-			return err
+			fr.state.currentRound = Blame
+			if err2 := fr.createAndBroadcastBlameOfInvalidScaler(operatorID, protocolMessage.Round1Message.ProofS, []byte(err.Error())); err2 != nil {
+				return err2
+			}
+
+			if blame, err2 := fr.processBlame(); err2 != nil {
+				return err2
+			} else {
+				return ErrBlame{BlameOutput: blame}
+			}
 		}
 		Ci, err := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofR)
 		if err != nil {
-			return err
+			fr.state.currentRound = Blame
+			if err2 := fr.createAndBroadcastBlameOfInvalidScaler(operatorID, protocolMessage.Round1Message.ProofR, []byte(err.Error())); err2 != nil {
+				return err2
+			}
+
+			if blame, err2 := fr.processBlame(); err2 != nil {
+				return err2
+			} else {
+				return ErrBlame{BlameOutput: blame}
+			}
 		}
 
 		bcastMessage := &frost.Round1Bcast{
