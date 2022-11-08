@@ -34,21 +34,21 @@ type State struct {
 	sessionSK  *ecies.PrivateKey
 
 	threshold    uint32
-	currentRound DKGRound
+	currentRound ProtocolRound
 	participant  *frost.DkgParticipant
 
 	operators      []uint32
 	operatorsOld   []uint32
 	operatorShares map[uint32]*bls.SecretKey
 
-	msgs            map[DKGRound]map[uint32]*dkg.SignedMessage
+	msgs            ProtocolMessageStore
 	oldKeyGenOutput *dkg.KeyGenOutput
 }
 
-type DKGRound int
+type ProtocolRound int
 
 const (
-	Uninitialized DKGRound = iota
+	Uninitialized ProtocolRound = iota
 	Preparation
 	Round1
 	Round2
@@ -56,50 +56,63 @@ const (
 	Blame
 )
 
+var rounds = []ProtocolRound{
+	Uninitialized,
+	Preparation,
+	Round1,
+	Round2,
+	KeygenOutput,
+	Blame,
+}
+
+type ProtocolMessageStore map[ProtocolRound]map[uint32]*dkg.SignedMessage
+
+func newProtocolMessageStore() ProtocolMessageStore {
+	m := make(map[ProtocolRound]map[uint32]*dkg.SignedMessage)
+	for _, round := range rounds {
+		m[round] = make(map[uint32]*dkg.SignedMessage)
+	}
+	return m
+}
+
 func New(
 	network dkg.Network,
 	operatorID types.OperatorID,
 	requestID dkg.RequestID,
 	signer types.DKGSigner,
 	storage dkg.Storage,
-) dkg.KeyGenProtocol {
+	init *dkg.Init,
+) dkg.Protocol {
 
-	msgs := make(map[DKGRound]map[uint32]*dkg.SignedMessage)
-	msgs[Preparation] = make(map[uint32]*dkg.SignedMessage)
-	msgs[Round1] = make(map[uint32]*dkg.SignedMessage)
-	msgs[Round2] = make(map[uint32]*dkg.SignedMessage)
-	msgs[Blame] = make(map[uint32]*dkg.SignedMessage)
-
-	return &FROST{
+	fr := &FROST{
 		network: network,
 		signer:  signer,
 		storage: storage,
 		state: &State{
-
 			identifier:     requestID,
 			operatorID:     operatorID,
+			threshold:      uint32(init.Threshold),
 			currentRound:   Uninitialized,
-			msgs:           msgs,
+			operators:      types.OperatorList(init.OperatorIDs).ToUint32List(),
 			operatorShares: make(map[uint32]*bls.SecretKey),
+			msgs:           newProtocolMessageStore(),
 		},
 	}
+
+	return fr
 }
 
+// Temporary, TODO: Remove and use interface with Reshare
 func NewResharing(
 	network dkg.Network,
 	operatorID types.OperatorID,
 	requestID dkg.RequestID,
 	signer types.DKGSigner,
 	storage dkg.Storage,
-	oldKeyGenOutput *dkg.KeyGenOutput,
-	operatorsOld []uint32,
-) dkg.KeyGenProtocol {
-
-	msgs := make(map[DKGRound]map[uint32]*dkg.SignedMessage)
-	msgs[Preparation] = make(map[uint32]*dkg.SignedMessage)
-	msgs[Round1] = make(map[uint32]*dkg.SignedMessage)
-	msgs[Round2] = make(map[uint32]*dkg.SignedMessage)
-	msgs[Blame] = make(map[uint32]*dkg.SignedMessage)
+	operatorsOld []types.OperatorID,
+	init *dkg.Reshare,
+	output *dkg.KeyGenOutput,
+) dkg.Protocol {
 
 	return &FROST{
 		network: network,
@@ -107,53 +120,53 @@ func NewResharing(
 		storage: storage,
 
 		state: &State{
-			msgs:            msgs,
 			identifier:      requestID,
 			operatorID:      operatorID,
-			operatorsOld:    operatorsOld,
-			oldKeyGenOutput: oldKeyGenOutput,
+			threshold:       uint32(init.Threshold),
+			currentRound:    Uninitialized,
+			operators:       types.OperatorList(init.OperatorIDs).ToUint32List(),
+			operatorsOld:    types.OperatorList(operatorsOld).ToUint32List(),
 			operatorShares:  make(map[uint32]*bls.SecretKey),
+			msgs:            newProtocolMessageStore(),
+			oldKeyGenOutput: output,
 		},
 	}
 }
 
 // TODO: If Reshare, confirm participating operators using qbft before kick-starting this process.
-func (fr *FROST) Start(init *dkg.Init) error {
-
+func (fr *FROST) Start() error {
 	fr.state.currentRound = Preparation
-	fr.state.threshold = uint32(init.Threshold)
-	fr.state.operators = types.OperatorList(init.OperatorIDs).ToUint32List()
 
 	ctx := make([]byte, 16)
 	if _, err := rand.Read(ctx); err != nil {
 		return err
 	}
-
-	participant, err := frost.NewDkgParticipant(uint32(fr.state.operatorID), uint32(len(fr.state.operators)), string(ctx), thisCurve, fr.state.operators...)
+	participant, err := frost.NewDkgParticipant(uint32(fr.state.operatorID), fr.state.threshold, string(ctx), thisCurve, fr.state.operators...)
 	if err != nil {
 		return errors.Wrap(err, "failed to initialize a dkg participant")
 	}
 	fr.state.participant = participant
 
-	if fr.needToRunThisRound(Preparation) {
-		k, err := ecies.GenerateKey()
-		if err != nil {
-			return errors.Wrap(err, "failed to generate session sk")
-		}
-		fr.state.sessionSK = k
-		msg := &ProtocolMsg{
-			Round: fr.state.currentRound,
-			PreparationMessage: &PreparationMessage{
-				SessionPk: k.PublicKey.Bytes(true),
-			},
-		}
-		return fr.broadcastDKGMessage(msg)
+	if !fr.needToRunCurrentRound() {
+		return nil
 	}
 
-	return nil
+	k, err := ecies.GenerateKey()
+	if err != nil {
+		return errors.Wrap(err, "failed to generate session sk")
+	}
+	fr.state.sessionSK = k
+
+	msg := &ProtocolMsg{
+		Round: fr.state.currentRound,
+		PreparationMessage: &PreparationMessage{
+			SessionPk: k.PublicKey.Bytes(true),
+		},
+	}
+	return fr.broadcastDKGMessage(msg)
 }
 
-func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, error) {
+func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.ProtocolOutcome, error) {
 
 	if err := fr.validateSignedMessage(msg); err != nil {
 		return false, nil, errors.Wrap(err, "failed to validate signed message")
@@ -163,20 +176,27 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 	if err := protocolMessage.Decode(msg.Message.Data); err != nil {
 		return false, nil, errors.Wrap(err, "failed to decode protocol msg")
 	}
-	if err := fr.validateProtocolMessage(protocolMessage); err != nil {
+	if valid := protocolMessage.validate(); !valid {
 		return false, nil, errors.New("failed to validate protocol message")
 	}
 
-	originalMessage, ok := fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)]
-	if ok && !fr.compareDataHash(originalMessage, msg) {
-		return false, nil, fr.createBlameTypeInconsistentMessageRequest(originalMessage, msg)
+	existingMessage, ok := fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)]
+
+	if isBlameTypeInconsisstent := ok && !fr.haveSameRoot(existingMessage, msg); isBlameTypeInconsisstent {
+		if err := fr.createAndBroadcastBlameOfInconsistentMessage(existingMessage, msg); err != nil {
+			return false, nil, err
+		}
+		if blame, err := fr.processBlame(); err != nil {
+			return false, nil, err
+		} else {
+			return true, &dkg.ProtocolOutcome{BlameOutput: blame}, nil
+		}
 	}
 
 	fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)] = msg
 
-	switch fr.state.currentRound {
+	switch protocolMessage.Round {
 	case Preparation:
-		// Received all
 		if fr.canProceedThisRound() {
 			fr.state.currentRound = Round1
 			if err := fr.processRound1(); err != nil {
@@ -187,6 +207,9 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 		if fr.canProceedThisRound() {
 			fr.state.currentRound = Round2
 			if err := fr.processRound2(); err != nil {
+				if err.Error() == "invalid share" {
+					return true, &dkg.ProtocolOutcome{BlameOutput: err.(ErrInvalidShare).BlameOutput}, nil
+				}
 				return false, nil, err
 			}
 		}
@@ -197,14 +220,15 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 			if err != nil {
 				return false, nil, err
 			}
-			return true, &dkg.KeyGenOutcome{KeyGenOutput: out}, nil
+			return true, &dkg.ProtocolOutcome{ProtocolOutput: out}, nil
 		}
 	case Blame:
-		out, err := fr.processBlame()
+		fr.state.currentRound = Blame
+		blame, err := fr.processBlame()
 		if err != nil {
 			return false, nil, err
 		}
-		return true, &dkg.KeyGenOutcome{BlameOutput: out}, err
+		return true, &dkg.ProtocolOutcome{BlameOutput: blame}, nil
 	default:
 		return true, nil, dkg.ErrInvalidRound{}
 	}
@@ -213,24 +237,14 @@ func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.KeyGenOutcome, e
 }
 
 func (fr *FROST) canProceedThisRound() bool {
-
-	// Preparation (N) -> Round1 (O) -> Round2 (N)
-	switch fr.state.currentRound {
-	case Preparation:
-		return fr.allMessagesReceivedFor(Preparation, fr.state.operators)
-	case Round1:
-		if fr.isResharing() {
-			return fr.allMessagesReceivedFor(Round1, fr.state.operatorsOld)
-		} else {
-			return fr.allMessagesReceivedFor(Round1, fr.state.operators)
-		}
-	case Round2:
-		return fr.allMessagesReceivedFor(Round2, fr.state.operators)
+	// Note: for Resharing, Preparation (New Committee) -> Round1 (Old Committee) -> Round2 (New Committee)
+	if fr.isResharing() && fr.state.currentRound == Round1 {
+		return fr.allMessagesReceivedFor(Round1, fr.state.operatorsOld)
 	}
-	return true
+	return fr.allMessagesReceivedFor(fr.state.currentRound, fr.state.operators)
 }
 
-func (fr *FROST) allMessagesReceivedFor(round DKGRound, operators []uint32) bool {
+func (fr *FROST) allMessagesReceivedFor(round ProtocolRound, operators []uint32) bool {
 	for _, operatorID := range operators {
 		if _, ok := fr.state.msgs[round][operatorID]; !ok {
 			return false
@@ -261,20 +275,15 @@ func (fr *FROST) inNewCommittee() bool {
 	return false
 }
 
-func (fr *FROST) needToRunThisRound(thisRound DKGRound) bool {
-	// If new keygen, every round need to run
+func (fr *FROST) needToRunCurrentRound() bool {
 	if !fr.isResharing() {
-		return true
+		return true // always run for new keygen
 	}
-	switch thisRound {
-	case Preparation:
+	switch fr.state.currentRound {
+	case Preparation, Round2, KeygenOutput:
 		return fr.inNewCommittee()
 	case Round1:
 		return fr.inOldCommittee()
-	case Round2:
-		return fr.inNewCommittee()
-	case KeygenOutput:
-		return fr.inNewCommittee()
 	default:
 		return false
 	}
@@ -310,19 +319,7 @@ func (fr *FROST) validateSignedMessage(msg *dkg.SignedMessage) error {
 	return nil
 }
 
-func (fr *FROST) validateProtocolMessage(msg *ProtocolMsg) error {
-	if msg.Round != fr.state.currentRound {
-		return dkg.ErrMismatchRound{}
-	}
-
-	if valid := msg.validate(fr.state.currentRound); !valid {
-		return errors.New("invalid message")
-	}
-	return nil
-}
-
 func (fr *FROST) encryptByOperatorID(operatorID uint32, data []byte) ([]byte, error) {
-
 	msg, ok := fr.state.msgs[Preparation][operatorID]
 	if !ok {
 		return nil, errors.New("no session pk found for the operator")
@@ -342,7 +339,6 @@ func (fr *FROST) encryptByOperatorID(operatorID uint32, data []byte) ([]byte, er
 }
 
 func (fr *FROST) toSignedMessage(msg *ProtocolMsg) (*dkg.SignedMessage, error) {
-
 	msgBytes, err := msg.Encode()
 	if err != nil {
 		return nil, err
@@ -370,7 +366,6 @@ func (fr *FROST) toSignedMessage(msg *ProtocolMsg) (*dkg.SignedMessage, error) {
 		return nil, err
 	}
 	bcastMessage.Signature = sig
-
 	return bcastMessage, nil
 }
 
@@ -379,7 +374,6 @@ func (fr *FROST) broadcastDKGMessage(msg *ProtocolMsg) error {
 	if err != nil {
 		return err
 	}
-
 	fr.state.msgs[fr.state.currentRound][uint32(fr.state.operatorID)] = bcastMessage
 	return fr.network.BroadcastDKGMessage(bcastMessage)
 }

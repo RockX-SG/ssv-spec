@@ -11,13 +11,18 @@ import (
 	"github.com/herumi/bls-eth-go-binary/bls"
 )
 
+type TestOutcome struct {
+	KeygenOutcome TestKeygenOutcome
+	BlameOutcome  TestBlameOutcome
+}
+
 type TestKeygenOutcome struct {
 	ValidatorPK     string
 	Share           map[uint32]string
 	OperatorPubKeys map[uint32]string
 }
 
-func (o *TestKeygenOutcome) ToKeygenOutcomeMap(threshold uint64, operators []uint32) map[uint32]*dkg.KeyGenOutput {
+func (o TestKeygenOutcome) ToKeygenOutcomeMap(threshold uint64, operators []uint32) map[uint32]*dkg.KeyGenOutput {
 	m := make(map[uint32]*dkg.KeyGenOutput)
 
 	opPublicKeys := make(map[types.OperatorID]*bls.PublicKey)
@@ -54,7 +59,16 @@ func GetRandRequestID() dkg.RequestID {
 	requestID := dkg.RequestID{}
 	for i := range requestID {
 		rndInt, _ := crand.Int(crand.Reader, big.NewInt(255))
-		requestID[i] = rndInt.Bytes()[0]
+		if len(rndInt.Bytes()) == 0 {
+			requestID[i] = 0
+		} else {
+			requestID[i] = rndInt.Bytes()[0]
+		}
 	}
 	return requestID
+}
+
+type TestBlameOutcome struct {
+	Valid        bool
+	BlameMessage []byte
 }

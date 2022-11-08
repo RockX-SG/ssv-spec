@@ -17,6 +17,7 @@ import (
 type RequestID [24]byte
 
 const (
+	blsPubkeySize      = 48
 	ethAddressSize     = 20
 	ethAddressStartPos = 0
 	indexSize          = 4
@@ -55,6 +56,8 @@ const (
 	DepositDataMsgType
 	// OutputMsgType final output msg used by requester to make deposits and register validator with SSV
 	OutputMsgType
+	// ReshareMsgType sent when Resharing is requested
+	ReshareMsgType
 )
 
 type Message struct {
@@ -151,6 +154,43 @@ func (msg *Init) Decode(data []byte) error {
 	return json.Unmarshal(data, msg)
 }
 
+// Reshare triggers the resharing protocol
+type Reshare struct {
+	// ValidatorPK is the the public key to be reshared
+	ValidatorPK types.ValidatorPK
+	// OperatorIDs are the operators in the new set
+	OperatorIDs []types.OperatorID
+	// Threshold is the threshold of the new set
+	Threshold uint16
+}
+
+func (msg *Reshare) Validate() error {
+
+	if len(msg.ValidatorPK) != blsPubkeySize {
+		return errors.New("invalid validator pubkey size")
+	}
+
+	if len(msg.OperatorIDs) < 4 || (len(msg.OperatorIDs)-1)%3 != 0 {
+		return errors.New("invalid number of operators which has to be 3f+1")
+	}
+
+	if int(msg.Threshold) != (len(msg.OperatorIDs)-1)*2/3+1 {
+		return errors.New("invalid threshold which has to be 2f+1")
+	}
+
+	return nil
+}
+
+// Encode returns a msg encoded bytes or error
+func (msg *Reshare) Encode() ([]byte, error) {
+	return json.Marshal(msg)
+}
+
+// Decode returns error if decoding failed
+func (msg *Reshare) Decode(data []byte) error {
+	return json.Unmarshal(data, msg)
+}
+
 // Output is the last message in every DKG which marks a specific node's end of process
 type Output struct {
 	// RequestID for the DKG instance (not used for signing)
@@ -196,6 +236,8 @@ func (o *Output) GetRoot() ([]byte, error) {
 }
 
 type SignedOutput struct {
+	// Blame Data
+	BlameData *BlameData
 	// Data signed
 	Data *Output
 	// Signer Operator ID which signed
@@ -212,6 +254,45 @@ func (msg *SignedOutput) Encode() ([]byte, error) {
 // Decode returns error if decoding failed
 func (msg *SignedOutput) Decode(data []byte) error {
 	return json.Unmarshal(data, msg)
+}
+
+type BlameData struct {
+	RequestID    RequestID
+	Valid        bool
+	BlameMessage []byte
+}
+
+// Encode returns a msg encoded bytes or error
+func (msg *BlameData) Encode() ([]byte, error) {
+	return json.Marshal(msg)
+}
+
+// Decode returns error if decoding failed
+func (msg *BlameData) Decode(data []byte) error {
+	return json.Unmarshal(data, msg)
+}
+
+func (msg *BlameData) GetRoot() ([]byte, error) {
+	bytesSolidity, _ := abi.NewType("bytes", "", nil)
+	boolSolidity, _ := abi.NewType("bool", "", nil)
+
+	arguments := abi.Arguments{
+		{
+			Type: boolSolidity,
+		},
+		{
+			Type: bytesSolidity,
+		},
+	}
+
+	bytes, err := arguments.Pack(
+		msg.Valid,
+		[]byte(msg.BlameMessage),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return crypto.Keccak256(bytes), nil
 }
 
 func SignOutput(output *Output, privKey *ecdsa.PrivateKey) (types.Signature, error) {

@@ -22,7 +22,12 @@ var TestingDKGNode = func(keySet *TestKeySet) *dkg.Node {
 	network := NewTestingNetwork()
 	km := NewTestingKeyManager()
 	config := &dkg.Config{
-		Protocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID) dkg.KeyGenProtocol {
+		KeygenProtocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID, signer types.DKGSigner, storage dkg.Storage, init *dkg.Init) dkg.Protocol {
+			return &TestingKeygenProtocol{
+				KeyGenOutput: keySet.KeyGenOutput(1),
+			}
+		},
+		ReshareProtocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID, signer types.DKGSigner, storage dkg.Storage, oldOperators []types.OperatorID, reshare *dkg.Reshare, output *dkg.KeyGenOutput) dkg.Protocol {
 			return &TestingKeygenProtocol{
 				KeyGenOutput: keySet.KeyGenOutput(1),
 			}
@@ -55,14 +60,30 @@ var SignDKGMsg = func(sk *ecdsa.PrivateKey, id types.OperatorID, msg *dkg.Messag
 }
 
 var InitMessageDataBytes = func(operators []types.OperatorID, threshold uint16, withdrawalCred []byte, fork spec.Version) []byte {
-	m := &dkg.Init{
+	byts, _ := InitMessageData(operators, threshold, withdrawalCred, fork).Encode()
+	return byts
+}
+
+var InitMessageData = func(operators []types.OperatorID, threshold uint16, withdrawalCred []byte, fork spec.Version) *dkg.Init {
+	return &dkg.Init{
 		OperatorIDs:           operators,
 		Threshold:             threshold,
 		WithdrawalCredentials: withdrawalCred,
 		Fork:                  fork,
 	}
-	byts, _ := m.Encode()
+}
+
+var ReshareMessageDataBytes = func(operators []types.OperatorID, threshold uint16, validatorPK types.ValidatorPK) []byte {
+	byts, _ := ReshareMessageData(operators, threshold, validatorPK).Encode()
 	return byts
+}
+
+var ReshareMessageData = func(operators []types.OperatorID, threshold uint16, validatorPK types.ValidatorPK) *dkg.Reshare {
+	return &dkg.Reshare{
+		ValidatorPK: validatorPK,
+		OperatorIDs: operators,
+		Threshold:   threshold,
+	}
 }
 
 var ProtocolMsgDataBytes = func(stage stubdkg.Stage) []byte {
@@ -143,11 +164,13 @@ func (ks *TestKeySet) SignedOutputObject(requestID dkg.RequestID, opId types.Ope
 	}
 	share := ks.Shares[opId]
 	o := &dkg.Output{
-		RequestID:            requestID,
-		EncryptedShare:       TestingEncryption(&ks.DKGOperators[opId].EncryptionKey.PublicKey, share.Serialize()),
-		SharePubKey:          share.GetPublicKey().Serialize(),
-		ValidatorPubKey:      ks.ValidatorPK.Serialize(),
-		DepositDataSignature: ks.ValidatorSK.SignByte(root).Serialize(),
+		RequestID:       requestID,
+		EncryptedShare:  TestingEncryption(&ks.DKGOperators[opId].EncryptionKey.PublicKey, share.Serialize()),
+		SharePubKey:     share.GetPublicKey().Serialize(),
+		ValidatorPubKey: ks.ValidatorPK.Serialize(),
+	}
+	if root != nil {
+		o.DepositDataSignature = ks.ValidatorSK.SignByte(root).Serialize()
 	}
 	root1, _ := o.GetRoot()
 

@@ -2,6 +2,7 @@ package frost
 
 import (
 	"encoding/hex"
+	"sort"
 	"testing"
 
 	"github.com/bloxapp/ssv-spec/dkg"
@@ -13,21 +14,27 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type MessagesForNodes map[uint32][]*dkg.SignedMessage
+
 type FrostSpecTest struct {
-	Name string
+	Name   string
+	Keyset *testingutils.TestKeySet
 
 	// Keygen Options
+	RequestID dkg.RequestID
 	Threshold uint64
 	Operators []types.OperatorID
 
 	// Resharing Options
 	IsResharing       bool
 	OperatorsOld      []types.OperatorID
-	OldKeygenOutcomes *testingutils.TestKeygenOutcome
+	OldKeygenOutcomes testingutils.TestOutcome
 
 	// Expected
-	ExpectedOutcome testingutils.TestKeygenOutcome
+	ExpectedOutcome testingutils.TestOutcome
 	ExpectedError   string
+
+	InputMessages map[int]MessagesForNodes
 }
 
 func (test *FrostSpecTest) TestName() string {
@@ -36,13 +43,7 @@ func (test *FrostSpecTest) TestName() string {
 
 func (test *FrostSpecTest) Run(t *testing.T) {
 
-	outcomes, err := TestingFrost(
-		test.Threshold,
-		test.Operators,
-		test.OperatorsOld,
-		test.IsResharing,
-		test.OldKeygenOutcomes,
-	)
+	outcomes, blame, err := test.TestingFrost()
 
 	if len(test.ExpectedError) > 0 {
 		require.EqualError(t, err, test.ExpectedError)
@@ -50,117 +51,66 @@ func (test *FrostSpecTest) Run(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	for _, operatorID := range test.Operators {
-		outcome := outcomes[uint32(operatorID)].KeyGenOutput
-
-		require.Equal(t, test.ExpectedOutcome.ValidatorPK, hex.EncodeToString(outcome.ValidatorPK))
-		require.Equal(t, test.ExpectedOutcome.Share[uint32(operatorID)], outcome.Share.SerializeToHexStr())
-		require.Equal(t, test.ExpectedOutcome.OperatorPubKeys[uint32(operatorID)], outcome.OperatorPubKeys[operatorID].SerializeToHexStr())
+	if blame != nil {
+		require.Equal(t, test.ExpectedOutcome.BlameOutcome.Valid, blame.Valid)
+		return
 	}
 
+	for _, operatorID := range test.Operators {
+
+		outcome := outcomes[uint32(operatorID)]
+		if outcome.ProtocolOutput != nil {
+			vk := hex.EncodeToString(outcome.ProtocolOutput.ValidatorPK)
+			sk := outcome.ProtocolOutput.Share.SerializeToHexStr()
+			pk := outcome.ProtocolOutput.OperatorPubKeys[operatorID].SerializeToHexStr()
+
+			t.Logf("printing outcome keys for operatorID %d\n", operatorID)
+			t.Logf("vk %s\n", vk)
+			t.Logf("sk %s\n", sk)
+			t.Logf("pk %s\n", pk)
+
+			require.Equal(t, test.ExpectedOutcome.KeygenOutcome.ValidatorPK, vk)
+			require.Equal(t, test.ExpectedOutcome.KeygenOutcome.Share[uint32(operatorID)], sk)
+			require.Equal(t, test.ExpectedOutcome.KeygenOutcome.OperatorPubKeys[uint32(operatorID)], pk)
+		}
+	}
 }
 
-func TestingFrost(threshold uint64, operators, operatorsOld []types.OperatorID, isResharing bool, oldKeygenOutcomes *testingutils.TestKeygenOutcome) (map[uint32]*dkg.KeyGenOutcome, error) {
+func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.ProtocolOutcome, *dkg.BlameOutput, error) {
 
 	testingutils.ResetRandSeed()
-	requestID := testingutils.GetRandRequestID()
 	dkgsigner := testingutils.NewTestingKeyManager()
 	storage := testingutils.NewTestingStorage()
 	network := testingutils.NewTestingNetwork()
 
-	nodes := make(map[types.OperatorID]*dkg.Node)
+	nodes := test.TestingFrostNodes(
+		test.RequestID,
+		network,
+		storage,
+		dkgsigner,
+	)
 
-	for _, operatorID := range operators {
-
-		_, operator, _ := storage.GetDKGOperator(operatorID)
-		p := frost.New(network, operatorID, requestID, dkgsigner, storage)
-
-		node := dkg.NewNode(
-			operator,
-			&dkg.Config{
-				Protocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID) dkg.KeyGenProtocol {
-					return p
-				},
-				Network: network,
-				Storage: storage,
-				Signer:  dkgsigner,
-			})
-		nodes[operatorID] = node
+	alloperators := test.Operators
+	if test.IsResharing {
+		alloperators = append(alloperators, test.OperatorsOld...)
 	}
 
-	if isResharing {
-
-		operatorsOldList := types.OperatorList(operatorsOld).ToUint32List()
-		keygenOutcomeOld := oldKeygenOutcomes.ToKeygenOutcomeMap(threshold, operatorsOldList)
-
-		for _, operatorID := range operatorsOld {
-
-			_, operator, _ := storage.GetDKGOperator(operatorID)
-			p := frost.NewResharing(network, operatorID, requestID, dkgsigner, storage, keygenOutcomeOld[uint32(operatorID)], operatorsOldList[:threshold+1])
-
-			node := dkg.NewNode(
-				operator,
-				&dkg.Config{
-					Protocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID) dkg.KeyGenProtocol {
-						return p
-					},
-					Network: network,
-					Storage: storage,
-					Signer:  dkgsigner,
-				})
-			nodes[operatorID] = node
-		}
-
-		for _, operatorID := range operators {
-
-			_, operator, _ := storage.GetDKGOperator(operatorID)
-			p := frost.NewResharing(network, operatorID, requestID, dkgsigner, storage, nil, operatorsOldList[:threshold+1])
-
-			node := dkg.NewNode(
-				operator,
-				&dkg.Config{
-					Protocol: func(network dkg.Network, operatorID types.OperatorID, identifier dkg.RequestID) dkg.KeyGenProtocol {
-						return p
-					},
-					Network: network,
-					Storage: storage,
-					Signer:  dkgsigner,
-				})
-			nodes[operatorID] = node
-		}
+	initMessages, exists := test.InputMessages[0]
+	if !exists {
+		return nil, nil, errors.New("init messages not found in spec")
 	}
 
-	alloperators := operators
-	if isResharing {
-		alloperators = append(alloperators, operatorsOld...)
-	}
+	for operatorID, messages := range initMessages {
+		for _, message := range messages {
 
-	initMsg := &dkg.Init{
-		OperatorIDs:           operators,
-		Threshold:             uint16(threshold),
-		WithdrawalCredentials: testingutils.TestingWithdrawalCredentials,
-		Fork:                  testingutils.TestingForkVersion,
-	}
-	initMsgBytes, _ := initMsg.Encode()
-
-	for _, operatorID := range alloperators {
-
-		initSignedMessage, _ := toSignedMessage(
-			requestID,
-			operatorID,
-			dkg.InitMsgType,
-			initMsgBytes,
-			storage,
-			dkgsigner,
-		)
-		initSignedMessageBytes, _ := initSignedMessage.Encode()
-
-		startMessage := &types.SSVMessage{
-			MsgType: types.DKGMsgType,
-			Data:    initSignedMessageBytes,
-		}
-		if err := nodes[operatorID].ProcessMessage(startMessage); err != nil {
-			return nil, errors.Wrapf(err, "failed to start dkg protocol for operator %d", operatorID)
+			messageBytes, _ := message.Encode()
+			startMessage := &types.SSVMessage{
+				MsgType: types.DKGMsgType,
+				Data:    messageBytes,
+			}
+			if err := nodes[types.OperatorID(operatorID)].ProcessMessage(startMessage); err != nil {
+				return nil, nil, errors.Wrapf(err, "failed to start dkg protocol for operator %d", operatorID)
+			}
 		}
 	}
 
@@ -168,82 +118,150 @@ func TestingFrost(threshold uint64, operators, operatorsOld []types.OperatorID, 
 
 		messages := network.BroadcastedMsgs
 		network.BroadcastedMsgs = make([]*types.SSVMessage, 0)
-
 		for _, msg := range messages {
 
 			dkgMsg := &dkg.SignedMessage{}
 			if err := dkgMsg.Decode(msg.Data); err != nil {
-				return nil, err
+				return nil, nil, err
+			}
+
+			msgsToBroadcast := []*types.SSVMessage{}
+			if testMessages, ok := test.InputMessages[round][uint32(dkgMsg.Signer)]; ok {
+				for _, testMessage := range testMessages {
+					testMessageBytes, _ := testMessage.Encode()
+					msgsToBroadcast = append(msgsToBroadcast, &types.SSVMessage{
+						MsgType: msg.MsgType,
+						Data:    testMessageBytes,
+					})
+				}
+			} else {
+				msgsToBroadcast = append(msgsToBroadcast, msg)
 			}
 
 			operatorList := alloperators
-			if isResharing && round > 2 {
-				operatorList = operators
+			if test.IsResharing && round > 2 {
+				operatorList = test.Operators
 			}
+
+			sort.SliceStable(operatorList, func(i, j int) bool {
+				return operatorList[i] < operatorList[j]
+			})
 
 			for _, operatorID := range operatorList {
 
 				if operatorID == dkgMsg.Signer {
 					continue
 				}
-				if err := nodes[operatorID].ProcessMessage(msg); err != nil {
-					return nil, err
+
+				for _, msgToBroadcast := range msgsToBroadcast {
+					if err := nodes[operatorID].ProcessMessage(msgToBroadcast); err != nil {
+						return nil, nil, err
+					}
 				}
 			}
 		}
+
 	}
 
-	ks := testingutils.Testing13SharesSet()
-	ret := make(map[uint32]*dkg.KeyGenOutcome)
+	ret := make(map[uint32]*dkg.ProtocolOutcome)
+
 	outputs := network.DKGOutputs
+	blame := network.BlameOutput
+	if blame != nil {
+		return nil, blame, nil
+	}
 
 	for operatorID, output := range outputs {
+		if output.BlameData != nil {
+			ret[uint32(operatorID)] = &dkg.ProtocolOutcome{
+				BlameOutput: &dkg.BlameOutput{
+					Valid:        output.BlameData.Valid,
+					BlameMessage: output.BlameData.BlameMessage,
+				},
+			}
+			continue
+		}
+
 		pk := &bls.PublicKey{}
 		pk.Deserialize(output.Data.SharePubKey)
 
-		share, _ := dkgsigner.Decrypt(ks.DKGOperators[operatorID].EncryptionKey, output.Data.EncryptedShare)
+		share, _ := dkgsigner.Decrypt(test.Keyset.DKGOperators[operatorID].EncryptionKey, output.Data.EncryptedShare)
 		sk := &bls.SecretKey{}
 		sk.Deserialize(share)
 
-		ret[uint32(operatorID)] = &dkg.KeyGenOutcome{
-			KeyGenOutput: &dkg.KeyGenOutput{
+		ret[uint32(operatorID)] = &dkg.ProtocolOutcome{
+			ProtocolOutput: &dkg.KeyGenOutput{
 				ValidatorPK: output.Data.ValidatorPubKey,
 				Share:       sk,
 				OperatorPubKeys: map[types.OperatorID]*bls.PublicKey{
 					operatorID: pk,
 				},
-				Threshold: threshold,
+				Threshold: test.Threshold,
 			},
 		}
 	}
 
-	return ret, nil
+	return ret, nil, nil
 }
 
-func toSignedMessage(requestID dkg.RequestID, id types.OperatorID, msgType dkg.MsgType, data []byte, storage dkg.Storage, signer types.DKGSigner) (*dkg.SignedMessage, error) {
+func (test *FrostSpecTest) TestingFrostNodes(
+	requestID dkg.RequestID,
+	network dkg.Network,
+	storage dkg.Storage,
+	dkgsigner types.DKGSigner,
+) map[types.OperatorID]*dkg.Node {
 
-	signedMessage := &dkg.SignedMessage{
-		Message: &dkg.Message{
-			MsgType:    msgType,
-			Identifier: requestID,
-			Data:       data,
-		},
-		Signer: id,
+	nodes := make(map[types.OperatorID]*dkg.Node)
+	for _, operatorID := range test.Operators {
+		_, operator, _ := storage.GetDKGOperator(operatorID)
+		node := dkg.NewNode(
+			operator,
+			&dkg.Config{
+				KeygenProtocol: frost.New,
+				Network:        network,
+				Storage:        storage,
+				Signer:         dkgsigner,
+			})
+		nodes[operatorID] = node
 	}
 
-	exist, operator, err := storage.GetDKGOperator(id)
-	if err != nil {
-		return nil, err
-	}
-	if !exist {
-		return nil, errors.Errorf("operator with id %d not found", id)
-	}
+	if test.IsResharing {
+		operatorsOldList := types.OperatorList(test.OperatorsOld).ToUint32List()
+		keygenOutcomeOld := test.OldKeygenOutcomes.KeygenOutcome.ToKeygenOutcomeMap(test.Threshold, operatorsOldList)
 
-	sig, err := signer.SignDKGOutput(signedMessage, operator.ETHAddress)
-	if err != nil {
-		return nil, err
-	}
-	signedMessage.Signature = sig
+		for _, operatorID := range test.OperatorsOld {
+			storage := testingutils.NewTestingStorage()
+			_ = storage.SaveKeyGenOutput(keygenOutcomeOld[uint32(operatorID)])
 
-	return signedMessage, nil
+			_, operator, _ := storage.GetDKGOperator(operatorID)
+			node := dkg.NewResharingNode(
+				operator,
+				test.OperatorsOld,
+				&dkg.Config{
+					ReshareProtocol: frost.NewResharing,
+					Network:         network,
+					Storage:         storage,
+					Signer:          dkgsigner,
+				})
+			nodes[operatorID] = node
+		}
+
+		for _, operatorID := range test.Operators {
+			storage := testingutils.NewTestingStorage()
+			_ = storage.SaveKeyGenOutput(keygenOutcomeOld[operatorsOldList[0]])
+
+			_, operator, _ := storage.GetDKGOperator(operatorID)
+			node := dkg.NewResharingNode(
+				operator,
+				test.OperatorsOld,
+				&dkg.Config{
+					ReshareProtocol: frost.NewResharing,
+					Network:         network,
+					Storage:         storage,
+					Signer:          dkgsigner,
+				})
+			nodes[operatorID] = node
+		}
+	}
+	return nodes
 }
