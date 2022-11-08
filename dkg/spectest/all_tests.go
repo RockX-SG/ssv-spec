@@ -16,8 +16,9 @@ var AllTests = []SpecTest{
 	tests.HappyFlow(),
 
 	frost.Keygen(),
-	frost.Resharing(),
-	frost.BlameTypeInvalidShare(),
-	frost.BlameTypeInconsistentMessage(),
-	tests.ResharingHappyFlow(),
+	frost.BlameTypeFailedEcies(),
+	// frost.Resharing(),
+	// frost.BlameTypeInvalidShare(),
+	// frost.BlameTypeInconsistentMessage(),
+	// tests.ResharingHappyFlow(),
 }
