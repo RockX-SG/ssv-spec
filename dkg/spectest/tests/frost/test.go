@@ -183,11 +183,11 @@ func (test *FrostSpecTest) TestingFrost() (map[uint32]*dkg.ProtocolOutcome, *dkg
 		}
 
 		pk := &bls.PublicKey{}
-		pk.Deserialize(output.Data.SharePubKey)
+		_ = pk.Deserialize(output.Data.SharePubKey)
 
 		share, _ := dkgsigner.Decrypt(test.Keyset.DKGOperators[operatorID].EncryptionKey, output.Data.EncryptedShare)
 		sk := &bls.SecretKey{}
-		sk.Deserialize(share)
+		_ = sk.Deserialize(share)
 
 		ret[uint32(operatorID)] = &dkg.ProtocolOutcome{
 			ProtocolOutput: &dkg.KeyGenOutput{

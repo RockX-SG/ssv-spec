@@ -81,7 +81,10 @@ func (fr *FROST) partialInterpolate() ([]byte, error) {
 	for i, id := range fr.state.operatorsOld {
 		(&indices[i]).SetInt64(int64(id))
 		if types.OperatorID(id) == fr.state.operatorID {
-			(&values[i]).Deserialize(fr.state.oldKeyGenOutput.Share.Serialize())
+			err := (&values[i]).Deserialize(fr.state.oldKeyGenOutput.Share.Serialize())
+			if err != nil {
+				return nil, err
+			}
 		} else {
 			(&values[i]).SetInt64(0)
 		}
