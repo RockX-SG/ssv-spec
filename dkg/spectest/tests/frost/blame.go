@@ -356,7 +356,7 @@ func makeInvalid(t frost.BlameType, data []byte) []byte {
 
 func makeInvalidForFailedEcies(data []byte) []byte {
 	protocolMessage := &frost.ProtocolMsg{}
-	protocolMessage.Decode(data)
+	_ = protocolMessage.Decode(data)
 
 	protocolMessage.Round1Message.Shares[maliciousOperatorID] = []byte("rubbish-value")
 	d, _ := protocolMessage.Encode()
@@ -365,7 +365,7 @@ func makeInvalidForFailedEcies(data []byte) []byte {
 
 func makeInvalidForInvalidScaler(data []byte) []byte {
 	protocolMessage := &frost.ProtocolMsg{}
-	protocolMessage.Decode(data)
+	_ = protocolMessage.Decode(data)
 
 	protocolMessage.Round1Message.ProofR = []byte("rubbish-value")
 	d, _ := protocolMessage.Encode()
@@ -374,7 +374,7 @@ func makeInvalidForInvalidScaler(data []byte) []byte {
 
 func makeInvalidForInvalidCommitment(data []byte) []byte {
 	protocolMessage := &frost.ProtocolMsg{}
-	protocolMessage.Decode(data)
+	_ = protocolMessage.Decode(data)
 
 	protocolMessage.Round1Message.Commitment[len(protocolMessage.Round1Message.Commitment)-1] = []byte("rubbish-value")
 	d, _ := protocolMessage.Encode()
