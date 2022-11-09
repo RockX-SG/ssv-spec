@@ -1,6 +1,8 @@
 package frost
 
 import (
+	"fmt"
+
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/dkg/frost"
 	"github.com/bloxapp/ssv-spec/types"
@@ -10,6 +12,88 @@ import (
 var (
 	maliciousOperatorID uint32 = 2
 )
+
+func GetBlameSpecTest(testName string, data []byte) *FrostSpecTest {
+
+	requestID := testingutils.GetRandRequestID()
+	ks := testingutils.Testing4SharesSet()
+
+	threshold := 3
+	operators := []types.OperatorID{1, 2, 3, 4}
+
+	initMessages := make(map[uint32][]*dkg.SignedMessage)
+	initMsgBytes := testingutils.InitMessageDataBytes(
+		operators,
+		uint16(threshold),
+		testingutils.TestingWithdrawalCredentials,
+		testingutils.TestingForkVersion,
+	)
+	for _, operatorID := range operators {
+		initMessages[uint32(operatorID)] = []*dkg.SignedMessage{
+			testingutils.SignDKGMsg(ks.DKGOperators[operatorID].SK, operatorID, &dkg.Message{
+				MsgType:    dkg.InitMsgType,
+				Identifier: requestID,
+				Data:       initMsgBytes,
+			}),
+		}
+	}
+
+	blameProtocolMessageBytes := []byte(data)
+	blameSignedMessage := &dkg.SignedMessage{
+		Message: &dkg.Message{
+			MsgType:    dkg.ProtocolMsgType,
+			Identifier: requestID,
+			Data:       blameProtocolMessageBytes,
+		},
+		Signer: types.OperatorID(maliciousOperatorID),
+	}
+	sig, _ := testingutils.NewTestingKeyManager().SignDKGOutput(blameSignedMessage, ks.DKGOperators[2].ETHAddress)
+	blameSignedMessage.Signature = sig
+
+	return &FrostSpecTest{
+		Name:   "Blame Type Failed Ecies - Happy Flow",
+		Keyset: ks,
+
+		RequestID: requestID,
+		Threshold: uint64(threshold),
+		Operators: operators,
+
+		ExpectedOutcome: testingutils.TestOutcome{
+			BlameOutcome: testingutils.TestBlameOutcome{
+				Valid: true,
+			},
+		},
+		ExpectedError: "",
+
+		InputMessages: map[int]MessagesForNodes{
+			0: initMessages,
+			int(frost.Round1): {
+				maliciousOperatorID: []*dkg.SignedMessage{blameSignedMessage},
+			},
+		},
+	}
+}
+
+func BlameHappyFlow() map[frost.BlameType]*FrostSpecTest {
+
+	round1MessageBytes := []byte(`{"round":2,"round1":{"Commitment":["k4MGdjUKb5vaeYp9RKAjfli3H5uZfH8L3GMOyA5S7wiLi4Y33svE9h7TEYYyWVyZ","gTzEEi8g/nnVPMNDVxweRg19h2pgbIvvvLW8uUCKTqWoN1ziDjIhgJEg8oFhm04x","tp1XvVz+tm2Q1VwoyX/f44xUCNwHeYFD/xhEUwHG9+oL7/foxIjMpmRM3p7PRYvu"],"ProofS":"OSFPgOln/HjbVNReoKpvScuPAqCiP9anwHZnBkuZEDI=","ProofR":"C3LlHscA6yGlCEpPImTcB2drK7UUZN6Teur7uF2OOPc=","Shares":{"1":"BAZR3YHRROd8C9Sdm86LUd3MokNA67Vm6PV9WGO5zYUvZBN3VzFSNi3LWFCzwLgl8s/5EbTW0mtIvTz4xrnGV51DXO9G/Dpm5aTboIly98aM/AOEQMj3OHmEhsUsWPM5ADTTf9E+FBuEns78J9q6ckR0BDCeZMg60BPJhV1hoPGO","3":"BC9VN12p/aB3n52j4A/9ULr7brl4oGvF7pq4In5vhF7fNV5MUx4IlsYRIOm5w6GiMOvhd3WbgtDFTENmZet3ALT4d2sDlXpjjeSSjNH0unlNUCFqxt7u31e4kKG+NLJwEMKzkD2G+8QyEUw47/SQmipQErNzDMMCucQrGzrR7EHK","4":"BMxCC/3HWsJMqCqknlC46IrMqO0EMTCUWkSkNcq/0cZuw+cG4TeTpAjA3JFE1AEEqyVRu+J1DmaIoYnFwfxs+SPLwoRYcGhqBsyXTJbvr89J8rQ6oHsFUG80RPtb1nIolsCch32nwR2cvmHsIrpyCugWWGkORxIk0Dq3RAroMRYT"}}}`)
+
+	blameTypesToTest := []frost.BlameType{
+		frost.FailedEcies,
+		frost.InvalidScaler,
+		frost.InvalidCommitment,
+	}
+
+	tests := make(map[frost.BlameType]*FrostSpecTest)
+
+	for _, blame := range blameTypesToTest {
+		tests[blame] = GetBlameSpecTest(
+			fmt.Sprintf("Blame Type %s - Happy Flow", blame.ToString()),
+			makeInvalid(blame, round1MessageBytes),
+		)
+	}
+	return tests
+}
 
 func BlameTypeInvalidShare() *FrostSpecTest {
 
@@ -69,198 +153,6 @@ func BlameTypeInvalidShare() *FrostSpecTest {
 			0: initMessages,
 			2: {
 				2: []*dkg.SignedMessage{blameSignedMessage},
-			},
-		},
-	}
-}
-
-func BlameTypeFailedEcies() *FrostSpecTest {
-
-	requestID := testingutils.GetRandRequestID()
-	ks := testingutils.Testing4SharesSet()
-
-	threshold := 3
-	operators := []types.OperatorID{1, 2, 3, 4}
-
-	initMessages := make(map[uint32][]*dkg.SignedMessage)
-	initMsgBytes := testingutils.InitMessageDataBytes(
-		operators,
-		uint16(threshold),
-		testingutils.TestingWithdrawalCredentials,
-		testingutils.TestingForkVersion,
-	)
-	for _, operatorID := range operators {
-		initMessages[uint32(operatorID)] = []*dkg.SignedMessage{
-			testingutils.SignDKGMsg(ks.DKGOperators[operatorID].SK, operatorID, &dkg.Message{
-				MsgType:    dkg.InitMsgType,
-				Identifier: requestID,
-				Data:       initMsgBytes,
-			}),
-		}
-	}
-
-	// Data with malformed/rubbish value for encrypted share
-	data := makeInvalid(frost.FailedEcies, []byte(`{"round":2,"round1":{"Commitment":["k4MGdjUKb5vaeYp9RKAjfli3H5uZfH8L3GMOyA5S7wiLi4Y33svE9h7TEYYyWVyZ","gTzEEi8g/nnVPMNDVxweRg19h2pgbIvvvLW8uUCKTqWoN1ziDjIhgJEg8oFhm04x","tp1XvVz+tm2Q1VwoyX/f44xUCNwHeYFD/xhEUwHG9+oL7/foxIjMpmRM3p7PRYvu"],"ProofS":"OSFPgOln/HjbVNReoKpvScuPAqCiP9anwHZnBkuZEDI=","ProofR":"C3LlHscA6yGlCEpPImTcB2drK7UUZN6Teur7uF2OOPc=","Shares":{"1":"BAZR3YHRROd8C9Sdm86LUd3MokNA67Vm6PV9WGO5zYUvZBN3VzFSNi3LWFCzwLgl8s/5EbTW0mtIvTz4xrnGV51DXO9G/Dpm5aTboIly98aM/AOEQMj3OHmEhsUsWPM5ADTTf9E+FBuEns78J9q6ckR0BDCeZMg60BPJhV1hoPGO","3":"BC9VN12p/aB3n52j4A/9ULr7brl4oGvF7pq4In5vhF7fNV5MUx4IlsYRIOm5w6GiMOvhd3WbgtDFTENmZet3ALT4d2sDlXpjjeSSjNH0unlNUCFqxt7u31e4kKG+NLJwEMKzkD2G+8QyEUw47/SQmipQErNzDMMCucQrGzrR7EHK","4":"BMxCC/3HWsJMqCqknlC46IrMqO0EMTCUWkSkNcq/0cZuw+cG4TeTpAjA3JFE1AEEqyVRu+J1DmaIoYnFwfxs+SPLwoRYcGhqBsyXTJbvr89J8rQ6oHsFUG80RPtb1nIolsCch32nwR2cvmHsIrpyCugWWGkORxIk0Dq3RAroMRYT"}}}`))
-
-	blameProtocolMessageBytes := []byte(data)
-	blameSignedMessage := &dkg.SignedMessage{
-		Message: &dkg.Message{
-			MsgType:    dkg.ProtocolMsgType,
-			Identifier: requestID,
-			Data:       blameProtocolMessageBytes,
-		},
-		Signer: types.OperatorID(maliciousOperatorID),
-	}
-	sig, _ := testingutils.NewTestingKeyManager().SignDKGOutput(blameSignedMessage, ks.DKGOperators[2].ETHAddress)
-	blameSignedMessage.Signature = sig
-
-	return &FrostSpecTest{
-		Name:   "Blame Type Failed Ecies - Happy Flow",
-		Keyset: ks,
-
-		RequestID: requestID,
-		Threshold: uint64(threshold),
-		Operators: operators,
-
-		ExpectedOutcome: testingutils.TestOutcome{
-			BlameOutcome: testingutils.TestBlameOutcome{
-				Valid: true,
-			},
-		},
-		ExpectedError: "",
-
-		InputMessages: map[int]MessagesForNodes{
-			0: initMessages,
-			int(frost.Round1): {
-				maliciousOperatorID: []*dkg.SignedMessage{blameSignedMessage},
-			},
-		},
-	}
-}
-
-func BlameTypeInvalidScaler() *FrostSpecTest {
-
-	requestID := testingutils.GetRandRequestID()
-	ks := testingutils.Testing4SharesSet()
-
-	threshold := 3
-	operators := []types.OperatorID{1, 2, 3, 4}
-
-	initMessages := make(map[uint32][]*dkg.SignedMessage)
-	initMsgBytes := testingutils.InitMessageDataBytes(
-		operators,
-		uint16(threshold),
-		testingutils.TestingWithdrawalCredentials,
-		testingutils.TestingForkVersion,
-	)
-	for _, operatorID := range operators {
-		initMessages[uint32(operatorID)] = []*dkg.SignedMessage{
-			testingutils.SignDKGMsg(ks.DKGOperators[operatorID].SK, operatorID, &dkg.Message{
-				MsgType:    dkg.InitMsgType,
-				Identifier: requestID,
-				Data:       initMsgBytes,
-			}),
-		}
-	}
-
-	// Data with malformed/rubbish value for ProofS/ProofR
-	data := makeInvalid(frost.InvalidScaler, []byte(`{"round":2,"round1":{"Commitment":["k4MGdjUKb5vaeYp9RKAjfli3H5uZfH8L3GMOyA5S7wiLi4Y33svE9h7TEYYyWVyZ","gTzEEi8g/nnVPMNDVxweRg19h2pgbIvvvLW8uUCKTqWoN1ziDjIhgJEg8oFhm04x","tp1XvVz+tm2Q1VwoyX/f44xUCNwHeYFD/xhEUwHG9+oL7/foxIjMpmRM3p7PRYvu"],"ProofS":"OSFPgOln/HjbVNReoKpvScuPAqCiP9anwHZnBkuZEDI=","ProofR":"C3LlHscA6yGlCEpPImTcB2drK7UUZN6Teur7uF2OOPc=","Shares":{"1":"BAZR3YHRROd8C9Sdm86LUd3MokNA67Vm6PV9WGO5zYUvZBN3VzFSNi3LWFCzwLgl8s/5EbTW0mtIvTz4xrnGV51DXO9G/Dpm5aTboIly98aM/AOEQMj3OHmEhsUsWPM5ADTTf9E+FBuEns78J9q6ckR0BDCeZMg60BPJhV1hoPGO","3":"BC9VN12p/aB3n52j4A/9ULr7brl4oGvF7pq4In5vhF7fNV5MUx4IlsYRIOm5w6GiMOvhd3WbgtDFTENmZet3ALT4d2sDlXpjjeSSjNH0unlNUCFqxt7u31e4kKG+NLJwEMKzkD2G+8QyEUw47/SQmipQErNzDMMCucQrGzrR7EHK","4":"BMxCC/3HWsJMqCqknlC46IrMqO0EMTCUWkSkNcq/0cZuw+cG4TeTpAjA3JFE1AEEqyVRu+J1DmaIoYnFwfxs+SPLwoRYcGhqBsyXTJbvr89J8rQ6oHsFUG80RPtb1nIolsCch32nwR2cvmHsIrpyCugWWGkORxIk0Dq3RAroMRYT"}}}`))
-
-	blameProtocolMessageBytes := []byte(data)
-	blameSignedMessage := &dkg.SignedMessage{
-		Message: &dkg.Message{
-			MsgType:    dkg.ProtocolMsgType,
-			Identifier: requestID,
-			Data:       blameProtocolMessageBytes,
-		},
-		Signer: types.OperatorID(maliciousOperatorID),
-	}
-	sig, _ := testingutils.NewTestingKeyManager().SignDKGOutput(blameSignedMessage, ks.DKGOperators[2].ETHAddress)
-	blameSignedMessage.Signature = sig
-
-	return &FrostSpecTest{
-		Name:   "Blame Type Failed Invalid Scaler - Happy Flow",
-		Keyset: ks,
-
-		RequestID: requestID,
-		Threshold: uint64(threshold),
-		Operators: operators,
-
-		ExpectedOutcome: testingutils.TestOutcome{
-			BlameOutcome: testingutils.TestBlameOutcome{
-				Valid: true,
-			},
-		},
-		ExpectedError: "",
-
-		InputMessages: map[int]MessagesForNodes{
-			0: initMessages,
-			int(frost.Round1): {
-				maliciousOperatorID: []*dkg.SignedMessage{blameSignedMessage},
-			},
-		},
-	}
-}
-
-func BlameTypeInvalidCommitment() *FrostSpecTest {
-
-	requestID := testingutils.GetRandRequestID()
-	ks := testingutils.Testing4SharesSet()
-
-	threshold := 3
-	operators := []types.OperatorID{1, 2, 3, 4}
-
-	initMessages := make(map[uint32][]*dkg.SignedMessage)
-	initMsgBytes := testingutils.InitMessageDataBytes(
-		operators,
-		uint16(threshold),
-		testingutils.TestingWithdrawalCredentials,
-		testingutils.TestingForkVersion,
-	)
-	for _, operatorID := range operators {
-		initMessages[uint32(operatorID)] = []*dkg.SignedMessage{
-			testingutils.SignDKGMsg(ks.DKGOperators[operatorID].SK, operatorID, &dkg.Message{
-				MsgType:    dkg.InitMsgType,
-				Identifier: requestID,
-				Data:       initMsgBytes,
-			}),
-		}
-	}
-
-	// Data with malformed/rubbish value for commitment
-	data := makeInvalid(frost.InvalidCommitment, []byte(`{"round":2,"round1":{"Commitment":["k4MGdjUKb5vaeYp9RKAjfli3H5uZfH8L3GMOyA5S7wiLi4Y33svE9h7TEYYyWVyZ","gTzEEi8g/nnVPMNDVxweRg19h2pgbIvvvLW8uUCKTqWoN1ziDjIhgJEg8oFhm04x","tp1XvVz+tm2Q1VwoyX/f44xUCNwHeYFD/xhEUwHG9+oL7/foxIjMpmRM3p7PRYvu"],"ProofS":"OSFPgOln/HjbVNReoKpvScuPAqCiP9anwHZnBkuZEDI=","ProofR":"C3LlHscA6yGlCEpPImTcB2drK7UUZN6Teur7uF2OOPc=","Shares":{"1":"BAZR3YHRROd8C9Sdm86LUd3MokNA67Vm6PV9WGO5zYUvZBN3VzFSNi3LWFCzwLgl8s/5EbTW0mtIvTz4xrnGV51DXO9G/Dpm5aTboIly98aM/AOEQMj3OHmEhsUsWPM5ADTTf9E+FBuEns78J9q6ckR0BDCeZMg60BPJhV1hoPGO","3":"BC9VN12p/aB3n52j4A/9ULr7brl4oGvF7pq4In5vhF7fNV5MUx4IlsYRIOm5w6GiMOvhd3WbgtDFTENmZet3ALT4d2sDlXpjjeSSjNH0unlNUCFqxt7u31e4kKG+NLJwEMKzkD2G+8QyEUw47/SQmipQErNzDMMCucQrGzrR7EHK","4":"BMxCC/3HWsJMqCqknlC46IrMqO0EMTCUWkSkNcq/0cZuw+cG4TeTpAjA3JFE1AEEqyVRu+J1DmaIoYnFwfxs+SPLwoRYcGhqBsyXTJbvr89J8rQ6oHsFUG80RPtb1nIolsCch32nwR2cvmHsIrpyCugWWGkORxIk0Dq3RAroMRYT"}}}`))
-
-	blameProtocolMessageBytes := []byte(data)
-	blameSignedMessage := &dkg.SignedMessage{
-		Message: &dkg.Message{
-			MsgType:    dkg.ProtocolMsgType,
-			Identifier: requestID,
-			Data:       blameProtocolMessageBytes,
-		},
-		Signer: types.OperatorID(maliciousOperatorID),
-	}
-	sig, _ := testingutils.NewTestingKeyManager().SignDKGOutput(blameSignedMessage, ks.DKGOperators[2].ETHAddress)
-	blameSignedMessage.Signature = sig
-
-	return &FrostSpecTest{
-		Name:   "Blame Type Failed Invalid Commitment - Happy Flow",
-		Keyset: ks,
-
-		RequestID: requestID,
-		Threshold: uint64(threshold),
-		Operators: operators,
-
-		ExpectedOutcome: testingutils.TestOutcome{
-			BlameOutcome: testingutils.TestBlameOutcome{
-				Valid: true,
-			},
-		},
-		ExpectedError: "",
-
-		InputMessages: map[int]MessagesForNodes{
-			0: initMessages,
-			int(frost.Round1): {
-				maliciousOperatorID: []*dkg.SignedMessage{blameSignedMessage},
 			},
 		},
 	}

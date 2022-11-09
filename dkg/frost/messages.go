@@ -108,3 +108,14 @@ const (
 	// InvalidScaler refers to sending invalid commitment values
 	InvalidCommitment
 )
+
+func (t BlameType) ToString() string {
+	m := map[BlameType]string{
+		InconsistentMessage: "Inconsistent Message",
+		InvalidShare:        "Invalid Share",
+		FailedEcies:         "Failed Ecies",
+		InvalidScaler:       "Invalid Scaler",
+		InvalidCommitment:   "Invalid Commitment",
+	}
+	return m[t]
+}
