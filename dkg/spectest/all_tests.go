@@ -20,6 +20,7 @@ var AllTests = []SpecTest{
 	frost.BlameTypeFailedEcies(),
 	frost.BlameTypeInvalidScaler(),
 	frost.BlameTypeInvalidShare(),
+	frost.BlameTypeInvalidCommitment(),
 	frost.BlameTypeInconsistentMessage(),
 	tests.ResharingHappyFlow(),
 }
