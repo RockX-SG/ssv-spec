@@ -27,7 +27,16 @@ func (fr *FROST) processRound2() error {
 		for _, commitmentBytes := range protocolMessage.Round1Message.Commitment {
 			commitment, err := thisCurve.Point.FromAffineCompressed(commitmentBytes)
 			if err != nil {
-				return err
+				fr.state.currentRound = Blame
+				if err2 := fr.createAndBroadcastBlameOfInvalidCommitment(operatorID, commitmentBytes, []byte(err.Error())); err2 != nil {
+					return err2
+				}
+
+				if blame, err2 := fr.processBlame(); err2 != nil {
+					return err2
+				} else {
+					return ErrBlame{BlameOutput: blame}
+				}
 			}
 			verifiers.Commitments = append(verifiers.Commitments, commitment)
 		}

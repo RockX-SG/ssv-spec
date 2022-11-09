@@ -105,4 +105,6 @@ const (
 	FailedEcies
 	// InvalidScaler refers to sending invalid scaler values for ProofS & ProofR
 	InvalidScaler
+	// InvalidScaler refers to sending invalid commitment values
+	InvalidCommitment
 )

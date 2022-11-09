@@ -33,6 +33,8 @@ func (fr *FROST) processBlame() (*dkg.BlameOutput, error) {
 			valid, _ = fr.processBlameTypeFailedEcies(operatorID, protocolMessage.BlameMessage)
 		case InvalidScaler:
 			valid, _ = fr.processBlameTypeInvalidScaler(operatorID, protocolMessage.BlameMessage)
+		case InvalidCommitment:
+			valid, _ = fr.processBlameTypeInvalidCommitment(operatorID, protocolMessage.BlameMessage)
 		}
 
 		serializedSigneMessage, err := msg.Encode()
@@ -196,6 +198,21 @@ func (fr *FROST) processBlameTypeInvalidScaler(operatorID uint32, blameMessage *
 	return true, nil
 }
 
+func (fr *FROST) processBlameTypeInvalidCommitment(operatorID uint32, blameMessage *BlameMessage) (bool /*valid*/, error) {
+
+	if len(blameMessage.BlameData) != 2 {
+		return false, errors.New("invalid blame data")
+	}
+
+	_, err := thisCurve.Point.FromAffineCompressed(blameMessage.BlameData[0] /* commitment value */)
+	if err == nil {
+		return false, errors.New("given curve point is valid")
+	} else if err.Error() != string(blameMessage.BlameData[1] /* err string */) {
+		return false, errors.New("unexpected error")
+	}
+	return true, nil
+}
+
 func (fr *FROST) createAndBroadcastBlameOfInconsistentMessage(existingMessage, newMessage *dkg.SignedMessage) error {
 	existingMessageBytes, err := existingMessage.Encode()
 	if err != nil {
@@ -254,6 +271,19 @@ func (fr *FROST) createAndBroadcastBlameOfInvalidScaler(operatorID uint32, scale
 			Type:             InvalidScaler,
 			TargetOperatorID: operatorID,
 			BlameData:        [][]byte{scaler, err},
+			BlamerSessionSk:  fr.state.sessionSK.Bytes(),
+		},
+	}
+	return fr.broadcastDKGMessage(msg)
+}
+
+func (fr *FROST) createAndBroadcastBlameOfInvalidCommitment(operatorID uint32, commitment []byte, err []byte) error {
+	msg := &ProtocolMsg{
+		Round: Blame,
+		BlameMessage: &BlameMessage{
+			Type:             InvalidCommitment,
+			TargetOperatorID: operatorID,
+			BlameData:        [][]byte{commitment, err},
 			BlamerSessionSk:  fr.state.sessionSK.Bytes(),
 		},
 	}
