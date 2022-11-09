@@ -51,7 +51,7 @@ func GetBlameSpecTest(testName string, data []byte) *FrostSpecTest {
 	blameSignedMessage.Signature = sig
 
 	return &FrostSpecTest{
-		Name:   "Blame Type Failed Ecies - Happy Flow",
+		Name:   testName,
 		Keyset: ks,
 
 		RequestID: requestID,
