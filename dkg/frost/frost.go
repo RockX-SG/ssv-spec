@@ -381,5 +381,5 @@ func (fr *FROST) broadcastDKGMessage(msg *ProtocolMsg) (*dkg.SignedMessage, erro
 	}
 	fr.state.msgs[fr.state.currentRound][uint32(fr.state.operatorID)] = bcastMessage
 	err = fr.network.BroadcastDKGMessage(bcastMessage)
-	return bcastMessage, nil
+	return bcastMessage, err
 }
