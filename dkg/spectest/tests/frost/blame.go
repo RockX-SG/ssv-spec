@@ -1,8 +1,6 @@
 package frost
 
 import (
-	"fmt"
-
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/dkg/frost"
 	"github.com/bloxapp/ssv-spec/types"
@@ -74,28 +72,30 @@ func GetBlameSpecTest(testName string, data []byte) *FrostSpecTest {
 	}
 }
 
-func BlameHappyFlow() map[frost.BlameType]*FrostSpecTest {
+var validRound1MsgBytes = []byte(`{"round":2,"round1":{"Commitment":["k4MGdjUKb5vaeYp9RKAjfli3H5uZfH8L3GMOyA5S7wiLi4Y33svE9h7TEYYyWVyZ","gTzEEi8g/nnVPMNDVxweRg19h2pgbIvvvLW8uUCKTqWoN1ziDjIhgJEg8oFhm04x","tp1XvVz+tm2Q1VwoyX/f44xUCNwHeYFD/xhEUwHG9+oL7/foxIjMpmRM3p7PRYvu"],"ProofS":"OSFPgOln/HjbVNReoKpvScuPAqCiP9anwHZnBkuZEDI=","ProofR":"C3LlHscA6yGlCEpPImTcB2drK7UUZN6Teur7uF2OOPc=","Shares":{"1":"BAZR3YHRROd8C9Sdm86LUd3MokNA67Vm6PV9WGO5zYUvZBN3VzFSNi3LWFCzwLgl8s/5EbTW0mtIvTz4xrnGV51DXO9G/Dpm5aTboIly98aM/AOEQMj3OHmEhsUsWPM5ADTTf9E+FBuEns78J9q6ckR0BDCeZMg60BPJhV1hoPGO","3":"BC9VN12p/aB3n52j4A/9ULr7brl4oGvF7pq4In5vhF7fNV5MUx4IlsYRIOm5w6GiMOvhd3WbgtDFTENmZet3ALT4d2sDlXpjjeSSjNH0unlNUCFqxt7u31e4kKG+NLJwEMKzkD2G+8QyEUw47/SQmipQErNzDMMCucQrGzrR7EHK","4":"BMxCC/3HWsJMqCqknlC46IrMqO0EMTCUWkSkNcq/0cZuw+cG4TeTpAjA3JFE1AEEqyVRu+J1DmaIoYnFwfxs+SPLwoRYcGhqBsyXTJbvr89J8rQ6oHsFUG80RPtb1nIolsCch32nwR2cvmHsIrpyCugWWGkORxIk0Dq3RAroMRYT"}}}`)
 
-	round1MessageBytes := []byte(`{"round":2,"round1":{"Commitment":["k4MGdjUKb5vaeYp9RKAjfli3H5uZfH8L3GMOyA5S7wiLi4Y33svE9h7TEYYyWVyZ","gTzEEi8g/nnVPMNDVxweRg19h2pgbIvvvLW8uUCKTqWoN1ziDjIhgJEg8oFhm04x","tp1XvVz+tm2Q1VwoyX/f44xUCNwHeYFD/xhEUwHG9+oL7/foxIjMpmRM3p7PRYvu"],"ProofS":"OSFPgOln/HjbVNReoKpvScuPAqCiP9anwHZnBkuZEDI=","ProofR":"C3LlHscA6yGlCEpPImTcB2drK7UUZN6Teur7uF2OOPc=","Shares":{"1":"BAZR3YHRROd8C9Sdm86LUd3MokNA67Vm6PV9WGO5zYUvZBN3VzFSNi3LWFCzwLgl8s/5EbTW0mtIvTz4xrnGV51DXO9G/Dpm5aTboIly98aM/AOEQMj3OHmEhsUsWPM5ADTTf9E+FBuEns78J9q6ckR0BDCeZMg60BPJhV1hoPGO","3":"BC9VN12p/aB3n52j4A/9ULr7brl4oGvF7pq4In5vhF7fNV5MUx4IlsYRIOm5w6GiMOvhd3WbgtDFTENmZet3ALT4d2sDlXpjjeSSjNH0unlNUCFqxt7u31e4kKG+NLJwEMKzkD2G+8QyEUw47/SQmipQErNzDMMCucQrGzrR7EHK","4":"BMxCC/3HWsJMqCqknlC46IrMqO0EMTCUWkSkNcq/0cZuw+cG4TeTpAjA3JFE1AEEqyVRu+J1DmaIoYnFwfxs+SPLwoRYcGhqBsyXTJbvr89J8rQ6oHsFUG80RPtb1nIolsCch32nwR2cvmHsIrpyCugWWGkORxIk0Dq3RAroMRYT"}}}`)
-
-	blameTypesToTest := []frost.BlameType{
-		frost.FailedEcies,
-		frost.InvalidScalar,
-		frost.InvalidCommitment,
-	}
-
-	tests := make(map[frost.BlameType]*FrostSpecTest)
-
-	for _, blame := range blameTypesToTest {
-		tests[blame] = GetBlameSpecTest(
-			fmt.Sprintf("Blame Type %s - Happy Flow", blame.ToString()),
-			makeInvalid(blame, round1MessageBytes),
-		)
-	}
-	return tests
+func BlameTypeInvalidCommitment() *FrostSpecTest {
+	return GetBlameSpecTest(
+		"Blame Type Invalid Commitment - Happy Flow",
+		makeInvalidForInvalidCommitment(validRound1MsgBytes),
+	)
 }
 
-func BlameTypeInvalidShare() *FrostSpecTest {
+func BlameTypeInvalidScalar() *FrostSpecTest {
+	return GetBlameSpecTest(
+		"Blame Type Invalid Scalar - Happy Flow",
+		makeInvalidForInvalidScalar(validRound1MsgBytes),
+	)
+}
+
+func BlameTypeInvalidShare_FailedShareDecryption() *FrostSpecTest {
+	return GetBlameSpecTest(
+		"Blame Type Invalid Share (Unable to Decrypt) - Happy Flow",
+		makeInvalidForFailedEcies(validRound1MsgBytes),
+	)
+}
+
+func BlameTypeInvalidShare_FailedValidationAgainstCommitment() *FrostSpecTest {
 
 	requestID := testingutils.GetRandRequestID()
 	ks := testingutils.Testing4SharesSet()
@@ -233,19 +233,6 @@ func BlameTypeInconsistentMessage() *FrostSpecTest {
 	}
 }
 
-func makeInvalid(t frost.BlameType, data []byte) []byte {
-	switch t {
-	case frost.FailedEcies:
-		return makeInvalidForFailedEcies(data)
-	case frost.InvalidScalar:
-		return makeInvalidForInvalidScaler(data)
-	case frost.InvalidCommitment:
-		return makeInvalidForInvalidCommitment(data)
-	default:
-		return nil
-	}
-}
-
 func makeInvalidForFailedEcies(data []byte) []byte {
 	protocolMessage := &frost.ProtocolMsg{}
 	_ = protocolMessage.Decode(data)
@@ -255,7 +242,7 @@ func makeInvalidForFailedEcies(data []byte) []byte {
 	return d
 }
 
-func makeInvalidForInvalidScaler(data []byte) []byte {
+func makeInvalidForInvalidScalar(data []byte) []byte {
 	protocolMessage := &frost.ProtocolMsg{}
 	_ = protocolMessage.Decode(data)
 

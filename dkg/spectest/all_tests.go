@@ -1,11 +1,9 @@
 package spectest
 
 import (
+	"github.com/bloxapp/ssv-spec/dkg/spectest/tests"
 	"testing"
 
-	fr "github.com/bloxapp/ssv-spec/dkg/frost"
-
-	"github.com/bloxapp/ssv-spec/dkg/spectest/tests"
 	"github.com/bloxapp/ssv-spec/dkg/spectest/tests/frost"
 )
 
@@ -19,10 +17,10 @@ var AllTests = []SpecTest{
 
 	frost.Keygen(),
 	frost.Resharing(),
-	frost.BlameHappyFlow()[fr.FailedEcies],
-	frost.BlameHappyFlow()[fr.InvalidCommitment],
-	frost.BlameHappyFlow()[fr.InvalidScalar],
-	frost.BlameTypeInvalidShare(),
+	frost.BlameTypeInvalidCommitment(),
+	frost.BlameTypeInvalidScalar(),
+	frost.BlameTypeInvalidShare_FailedShareDecryption(),
+	frost.BlameTypeInvalidShare_FailedValidationAgainstCommitment(),
 	frost.BlameTypeInconsistentMessage(),
 	tests.ResharingHappyFlow(),
 }

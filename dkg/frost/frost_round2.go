@@ -16,7 +16,7 @@ func (fr *FROST) processRound2() error {
 	bcast := make(map[uint32]*frost.Round1Bcast)
 	p2psend := make(map[uint32]*sharing.ShamirShare)
 
-	for operatorID, dkgMessage := range fr.state.msgs[Round1] {
+	for peerOID, dkgMessage := range fr.state.msgs[Round1] {
 
 		protocolMessage := &ProtocolMsg{}
 		if err := protocolMessage.Decode(dkgMessage.Message.Data); err != nil {
@@ -28,7 +28,7 @@ func (fr *FROST) processRound2() error {
 			commitment, err := thisCurve.Point.FromAffineCompressed(commitmentBytes)
 			if err != nil {
 				fr.state.currentRound = Blame
-				if err2 := fr.createAndBroadcastBlameOfInvalidCommitment(operatorID, commitmentBytes, []byte(err.Error())); err2 != nil {
+				if err2 := fr.createAndBroadcastBlameOfInvalidCommitment(peerOID, commitmentBytes, []byte(err.Error())); err2 != nil {
 					return err2
 				}
 
@@ -41,23 +41,11 @@ func (fr *FROST) processRound2() error {
 			verifiers.Commitments = append(verifiers.Commitments, commitment)
 		}
 
-		Wi, err := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofS)
-		if err != nil {
+		Wi, errS := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofS)
+		Ci, errR := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofR)
+		if errS != nil || errR != nil {
 			fr.state.currentRound = Blame
-			if err2 := fr.createAndBroadcastBlameOfInvalidScaler(operatorID, protocolMessage.Round1Message.ProofS, []byte(err.Error())); err2 != nil {
-				return err2
-			}
-
-			if blame, err2 := fr.processBlame(); err2 != nil {
-				return err2
-			} else {
-				return ErrBlame{BlameOutput: blame}
-			}
-		}
-		Ci, err := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofR)
-		if err != nil {
-			fr.state.currentRound = Blame
-			if err2 := fr.createAndBroadcastBlameOfInvalidScaler(operatorID, protocolMessage.Round1Message.ProofR, []byte(err.Error())); err2 != nil {
+			if err2 := fr.createAndBroadcastBlameOfInvalidMessage(peerOID, dkgMessage); err2 != nil {
 				return err2
 			}
 
@@ -73,9 +61,9 @@ func (fr *FROST) processRound2() error {
 			Wi:        Wi,
 			Ci:        Ci,
 		}
-		bcast[operatorID] = bcastMessage
+		bcast[peerOID] = bcastMessage
 
-		if uint32(fr.state.operatorID) == operatorID {
+		if uint32(fr.state.operatorID) == peerOID {
 			continue
 		}
 
@@ -83,7 +71,7 @@ func (fr *FROST) processRound2() error {
 		shareBytes, err := ecies.Decrypt(fr.state.sessionSK, encryptedShare)
 		if err != nil {
 			fr.state.currentRound = Blame
-			if err2 := fr.createAndBroadcastBlameOfFailedEcies(operatorID, encryptedShare, []byte(err.Error())); err2 != nil {
+			if err2 := fr.createAndBroadcastBlameOfInvalidShare(peerOID); err2 != nil {
 				return err2
 			}
 
@@ -99,12 +87,12 @@ func (fr *FROST) processRound2() error {
 			Value: shareBytes,
 		}
 
-		p2psend[operatorID] = share
+		p2psend[peerOID] = share
 
 		err = verifiers.Verify(share)
 		if err != nil {
 			fr.state.currentRound = Blame
-			if err2 := fr.createAndBroadcastBlameOfInvalidShare(operatorID); err2 != nil {
+			if err2 := fr.createAndBroadcastBlameOfInvalidShare(peerOID); err2 != nil {
 				return err2
 			}
 

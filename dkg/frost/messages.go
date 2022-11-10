@@ -101,9 +101,7 @@ const (
 	InconsistentMessage BlameType = iota
 	// InvalidShare refers to an operator sending invalid share
 	InvalidShare
-	// FailedEcies refers to failing of decryption of encrypted share using ecies
-	FailedEcies
-	// InvalidScalar refers to sending invalid scaler values for ProofS & ProofR
+	//// InvalidScalar refers to sending invalid scalar values for ProofS or ProofR
 	InvalidScalar
 	// InvalidScalar refers to sending invalid commitment values
 	InvalidCommitment
@@ -113,9 +111,9 @@ func (t BlameType) ToString() string {
 	m := map[BlameType]string{
 		InconsistentMessage: "Inconsistent Message",
 		InvalidShare:        "Invalid Share",
-		FailedEcies:         "Failed Ecies",
-		InvalidScalar:       "Invalid Scaler",
-		InvalidCommitment:   "Invalid Commitment",
+		//FailedEcies:         "Failed Ecies",
+		InvalidScalar:     "Invalid Scalar",
+		InvalidCommitment: "Invalid Commitment",
 	}
 	return m[t]
 }
