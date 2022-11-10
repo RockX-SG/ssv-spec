@@ -13,48 +13,39 @@ func (fr *FROST) checkBlame(blamerOID uint32, protocolMessage *ProtocolMsg) (boo
 	case InvalidShare:
 		return fr.processBlameTypeInvalidShare(blamerOID, protocolMessage.BlameMessage)
 	case InconsistentMessage:
-		return fr.processBlameTypeInconsistentMessage(blamerOID, protocolMessage.BlameMessage)
+		return fr.processBlameTypeInconsistentMessage(protocolMessage.BlameMessage)
 	case InvalidMessage:
-		return fr.processBlameTypeInvalidMessage(blamerOID, protocolMessage.BlameMessage)
+		return fr.processBlameTypeInvalidMessage(protocolMessage.BlameMessage)
 	default:
 		return false, errors.New("unrecognized blame type")
 	}
 }
 
-func (fr *FROST) processBlameTypeInvalidShare(operatorID uint32, blameMessage *BlameMessage) (bool /*valid*/, error) {
+func (fr *FROST) processBlameTypeInvalidShare(blamerOID uint32, blameMessage *BlameMessage) (bool /*valid*/, error) {
 	if err := blameMessage.Validate(); err != nil {
 		return false, errors.Wrap(err, "invalid blame message")
 	}
 	if len(blameMessage.BlameData) != 1 {
 		return false, errors.New("invalid blame data")
 	}
-	signedMessage := &dkg.SignedMessage{}
-	if err := signedMessage.Decode(blameMessage.BlameData[0]); err != nil {
-		return false, errors.Wrap(err, "unable to decode BlameData")
-	}
+	signedMessage, protocolMessage, err := fr.decodeMessage(blameMessage.BlameData[0])
+
 	if err := fr.validateSignedMessage(signedMessage); err != nil {
 		return false, errors.Wrap(err, "failed to Validate signature for blame data")
 	}
-	if signedMessage.Message.Identifier != fr.state.identifier {
-		return false, errors.New("the message doesn't belong to this session")
-	}
 
-	protocolMessage := ProtocolMsg{}
-	if err := protocolMessage.Decode(signedMessage.Message.Data); err != nil {
-		return false, errors.Wrap(err, "unable to decode protocolMessage")
-	}
 	round1Message := protocolMessage.Round1Message
 
-	blamesPrepMessage := fr.state.msgs[Preparation][operatorID]
-	prepProtocolMessage := &ProtocolMsg{}
-	err := prepProtocolMessage.Decode(blamesPrepMessage.Message.Data)
-	if err != nil || prepProtocolMessage.PreparationMessage == nil {
+	blamerPrepSignedMessage := fr.state.msgs[Preparation][blamerOID]
+	blamerPrepProtocolMessage := &ProtocolMsg{}
+	err = blamerPrepProtocolMessage.Decode(blamerPrepSignedMessage.Message.Data)
+	if err != nil || blamerPrepProtocolMessage.PreparationMessage == nil {
 		return false, errors.New("unable to decode blamer's PreparationMessage")
 	}
 
 	blamerSessionSK := ecies.NewPrivateKeyFromBytes(blameMessage.BlamerSessionSk)
 	blamerSessionPK := blamerSessionSK.PublicKey.Bytes(true)
-	if !bytes.Equal(blamerSessionPK, prepProtocolMessage.PreparationMessage.SessionPk) {
+	if !bytes.Equal(blamerSessionPK, blamerPrepProtocolMessage.PreparationMessage.SessionPk) {
 		return false, errors.New("blame's session pubkey is invalid")
 	}
 
@@ -67,13 +58,13 @@ func (fr *FROST) processBlameTypeInvalidShare(operatorID uint32, blameMessage *B
 		verifiers.Commitments = append(verifiers.Commitments, commitment)
 	}
 
-	shareBytes, err := ecies.Decrypt(blamerSessionSK, round1Message.Shares[operatorID])
+	shareBytes, err := ecies.Decrypt(blamerSessionSK, round1Message.Shares[blamerOID])
 	if err != nil {
 		return true, nil
 	}
 
 	share := &sharing.ShamirShare{
-		Id:    operatorID,
+		Id:    blamerOID,
 		Value: shareBytes,
 	}
 
@@ -95,7 +86,7 @@ func (fr *FROST) decodeMessage(data []byte) (*dkg.SignedMessage, *ProtocolMsg, e
 	return signedMsg, pMsg, nil
 }
 
-func (fr *FROST) processBlameTypeInconsistentMessage(operatorID uint32, blameMessage *BlameMessage) (bool /*valid*/, error) {
+func (fr *FROST) processBlameTypeInconsistentMessage(blameMessage *BlameMessage) (bool /*valid*/, error) {
 	if err := blameMessage.Validate(); err != nil {
 		return false, errors.Wrap(err, "invalid blame message")
 	}
@@ -135,7 +126,7 @@ func (fr *FROST) processBlameTypeInconsistentMessage(operatorID uint32, blameMes
 	return true, nil
 }
 
-func (fr *FROST) processBlameTypeInvalidMessage(operatorID uint32, blameMessage *BlameMessage) (bool /*valid*/, error) {
+func (fr *FROST) processBlameTypeInvalidMessage(blameMessage *BlameMessage) (bool /*valid*/, error) {
 	if err := blameMessage.Validate(); err != nil {
 		return false, errors.Wrap(err, "invalid blame message")
 	}
@@ -183,8 +174,8 @@ func (fr *FROST) createAndBroadcastBlameOfInconsistentMessage(existingMessage, n
 	}, err
 }
 
-func (fr *FROST) createAndBroadcastBlameOfInvalidShare(operatorID uint32) (*dkg.ProtocolOutcome, error) {
-	round1Bytes, err := fr.state.msgs[Round1][operatorID].Encode()
+func (fr *FROST) createAndBroadcastBlameOfInvalidShare(culpritOID uint32) (*dkg.ProtocolOutcome, error) {
+	round1Bytes, err := fr.state.msgs[Round1][culpritOID].Encode()
 	if err != nil {
 		return nil, err
 	}
@@ -192,7 +183,7 @@ func (fr *FROST) createAndBroadcastBlameOfInvalidShare(operatorID uint32) (*dkg.
 		Round: Blame,
 		BlameMessage: &BlameMessage{
 			Type:             InvalidShare,
-			TargetOperatorID: operatorID,
+			TargetOperatorID: culpritOID,
 			BlameData:        [][]byte{round1Bytes},
 			BlamerSessionSk:  fr.state.sessionSK.Bytes(),
 		},
@@ -206,7 +197,7 @@ func (fr *FROST) createAndBroadcastBlameOfInvalidShare(operatorID uint32) (*dkg.
 	}, err
 }
 
-func (fr *FROST) createAndBroadcastBlameOfInvalidMessage(peerOID uint32, message *dkg.SignedMessage) (*dkg.ProtocolOutcome, error) {
+func (fr *FROST) createAndBroadcastBlameOfInvalidMessage(culpritOID uint32, message *dkg.SignedMessage) (*dkg.ProtocolOutcome, error) {
 	bytes, err := message.Encode()
 	if err != nil {
 		return nil, err
@@ -216,7 +207,7 @@ func (fr *FROST) createAndBroadcastBlameOfInvalidMessage(peerOID uint32, message
 		Round: Blame,
 		BlameMessage: &BlameMessage{
 			Type:             InvalidMessage,
-			TargetOperatorID: peerOID,
+			TargetOperatorID: culpritOID,
 			BlameData:        [][]byte{bytes},
 			BlamerSessionSk:  fr.state.sessionSK.Bytes(),
 		},
