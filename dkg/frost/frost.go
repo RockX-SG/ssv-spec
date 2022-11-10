@@ -169,15 +169,23 @@ func (fr *FROST) Start() error {
 func (fr *FROST) ProcessMsg(msg *dkg.SignedMessage) (bool, *dkg.ProtocolOutcome, error) {
 
 	if err := fr.validateSignedMessage(msg); err != nil {
-		return false, nil, errors.Wrap(err, "failed to validate signed message")
+		return false, nil, errors.Wrap(err, "failed to Validate signed message")
 	}
 
 	protocolMessage := &ProtocolMsg{}
 	if err := protocolMessage.Decode(msg.Message.Data); err != nil {
 		return false, nil, errors.Wrap(err, "failed to decode protocol msg")
 	}
-	if valid := protocolMessage.validate(); !valid {
-		return false, nil, errors.New("failed to validate protocol message")
+	if err := protocolMessage.Validate(); err != nil {
+		fr.state.currentRound = Blame
+		if err := fr.createAndBroadcastBlameOfInvalidMessage(uint32(msg.Signer), msg); err != nil {
+			return false, nil, err
+		}
+		if blame, err := fr.processBlame(); err != nil {
+			return false, nil, err
+		} else {
+			return true, &dkg.ProtocolOutcome{BlameOutput: blame}, nil
+		}
 	}
 
 	existingMessage, ok := fr.state.msgs[protocolMessage.Round][uint32(msg.Signer)]

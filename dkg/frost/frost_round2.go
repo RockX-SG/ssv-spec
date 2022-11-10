@@ -22,38 +22,22 @@ func (fr *FROST) processRound2() error {
 		if err := protocolMessage.Decode(dkgMessage.Message.Data); err != nil {
 			return errors.Wrap(err, "failed to decode protocol msg")
 		}
-
 		verifiers := new(sharing.FeldmanVerifier)
 		for _, commitmentBytes := range protocolMessage.Round1Message.Commitment {
 			commitment, err := thisCurve.Point.FromAffineCompressed(commitmentBytes)
 			if err != nil {
-				fr.state.currentRound = Blame
-				if err2 := fr.createAndBroadcastBlameOfInvalidCommitment(peerOID, commitmentBytes, []byte(err.Error())); err2 != nil {
-					return err2
-				}
-
-				if blame, err2 := fr.processBlame(); err2 != nil {
-					return err2
-				} else {
-					return ErrBlame{BlameOutput: blame}
-				}
+				return errors.Wrap(err, "failed to decode commitment point")
 			}
 			verifiers.Commitments = append(verifiers.Commitments, commitment)
 		}
 
-		Wi, errS := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofS)
-		Ci, errR := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofR)
-		if errS != nil || errR != nil {
-			fr.state.currentRound = Blame
-			if err2 := fr.createAndBroadcastBlameOfInvalidMessage(peerOID, dkgMessage); err2 != nil {
-				return err2
-			}
-
-			if blame, err2 := fr.processBlame(); err2 != nil {
-				return err2
-			} else {
-				return ErrBlame{BlameOutput: blame}
-			}
+		Wi, err := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofS)
+		if err != nil {
+			return errors.Wrap(err, "failed to decode scalar")
+		}
+		Ci, err := thisCurve.Scalar.SetBytes(protocolMessage.Round1Message.ProofR)
+		if err != nil {
+			return errors.Wrap(err, "failed to decode scalar")
 		}
 
 		bcastMessage := &frost.Round1Bcast{

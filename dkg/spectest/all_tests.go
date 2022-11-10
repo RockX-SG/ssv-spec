@@ -2,9 +2,8 @@ package spectest
 
 import (
 	"github.com/bloxapp/ssv-spec/dkg/spectest/tests"
-	"testing"
-
 	"github.com/bloxapp/ssv-spec/dkg/spectest/tests/frost"
+	"testing"
 )
 
 type SpecTest interface {
