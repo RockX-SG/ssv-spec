@@ -8,41 +8,17 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (fr *FROST) processBlame() (*dkg.BlameOutput, error) {
-
-	for operatorID, msg := range fr.state.msgs[Blame] {
-
-		protocolMessage := &ProtocolMsg{}
-		if err := protocolMessage.Decode(msg.Message.Data); err != nil {
-			return nil, errors.New("failed to decode blame data")
-		}
-
-		var (
-			valid bool
-			err   error
-		)
-
-		switch protocolMessage.BlameMessage.Type {
-		case InvalidShare:
-			valid, _ = fr.processBlameTypeInvalidShare(operatorID, protocolMessage.BlameMessage)
-		case InconsistentMessage:
-			valid, _ = fr.processBlameTypeInconsistentMessage(operatorID, protocolMessage.BlameMessage)
-		case InvalidMessage:
-			valid, _ = fr.processBlameTypeInvalidMessage(operatorID, protocolMessage.BlameMessage)
-		}
-
-		serializedSigneMessage, err := msg.Encode()
-		if err != nil {
-			return nil, err
-		}
-		blameOutput := &dkg.BlameOutput{
-			Valid:        valid,
-			BlameMessage: serializedSigneMessage,
-		}
-		return blameOutput, nil
+func (fr *FROST) checkBlame(blamerOID uint32, protocolMessage *ProtocolMsg) (bool, error) {
+	switch protocolMessage.BlameMessage.Type {
+	case InvalidShare:
+		return fr.processBlameTypeInvalidShare(blamerOID, protocolMessage.BlameMessage)
+	case InconsistentMessage:
+		return fr.processBlameTypeInconsistentMessage(blamerOID, protocolMessage.BlameMessage)
+	case InvalidMessage:
+		return fr.processBlameTypeInvalidMessage(blamerOID, protocolMessage.BlameMessage)
+	default:
+		return false, errors.New("unrecognized blame type")
 	}
-
-	return nil, nil
 }
 
 func (fr *FROST) processBlameTypeInvalidShare(operatorID uint32, blameMessage *BlameMessage) (bool /*valid*/, error) {
@@ -93,7 +69,7 @@ func (fr *FROST) processBlameTypeInvalidShare(operatorID uint32, blameMessage *B
 
 	shareBytes, err := ecies.Decrypt(blamerSessionSK, round1Message.Shares[operatorID])
 	if err != nil {
-		return true, err
+		return true, nil
 	}
 
 	share := &sharing.ShamirShare{
@@ -101,10 +77,10 @@ func (fr *FROST) processBlameTypeInvalidShare(operatorID uint32, blameMessage *B
 		Value: shareBytes,
 	}
 
-	if err = verifiers.Verify(share); err == nil {
-		return false, nil
+	if err = verifiers.Verify(share); err != nil {
+		return true, nil
 	}
-	return true, err
+	return false, err
 }
 
 func (fr *FROST) decodeMessage(data []byte) (*dkg.SignedMessage, *ProtocolMsg, error) {
@@ -180,14 +156,14 @@ func (fr *FROST) processBlameTypeInvalidMessage(operatorID uint32, blameMessage 
 	return false, errors.New("message is valid")
 }
 
-func (fr *FROST) createAndBroadcastBlameOfInconsistentMessage(existingMessage, newMessage *dkg.SignedMessage) error {
+func (fr *FROST) createAndBroadcastBlameOfInconsistentMessage(existingMessage, newMessage *dkg.SignedMessage) (*dkg.ProtocolOutcome, error) {
 	existingMessageBytes, err := existingMessage.Encode()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	newMessageBytes, err := newMessage.Encode()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	msg := &ProtocolMsg{
 		Round: Blame,
@@ -198,13 +174,19 @@ func (fr *FROST) createAndBroadcastBlameOfInconsistentMessage(existingMessage, n
 			BlamerSessionSk:  fr.state.sessionSK.Bytes(),
 		},
 	}
-	return fr.broadcastDKGMessage(msg)
+	signedMessage, err := fr.broadcastDKGMessage(msg)
+	return &dkg.ProtocolOutcome{
+		BlameOutput: &dkg.BlameOutput{
+			Valid:        true,
+			BlameMessage: signedMessage,
+		},
+	}, err
 }
 
-func (fr *FROST) createAndBroadcastBlameOfInvalidShare(operatorID uint32) error {
+func (fr *FROST) createAndBroadcastBlameOfInvalidShare(operatorID uint32) (*dkg.ProtocolOutcome, error) {
 	round1Bytes, err := fr.state.msgs[Round1][operatorID].Encode()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	msg := &ProtocolMsg{
 		Round: Blame,
@@ -215,13 +197,19 @@ func (fr *FROST) createAndBroadcastBlameOfInvalidShare(operatorID uint32) error 
 			BlamerSessionSk:  fr.state.sessionSK.Bytes(),
 		},
 	}
-	return fr.broadcastDKGMessage(msg)
+	signedMessage, err := fr.broadcastDKGMessage(msg)
+	return &dkg.ProtocolOutcome{
+		BlameOutput: &dkg.BlameOutput{
+			Valid:        true,
+			BlameMessage: signedMessage,
+		},
+	}, err
 }
 
-func (fr *FROST) createAndBroadcastBlameOfInvalidMessage(peerOID uint32, message *dkg.SignedMessage) error {
+func (fr *FROST) createAndBroadcastBlameOfInvalidMessage(peerOID uint32, message *dkg.SignedMessage) (*dkg.ProtocolOutcome, error) {
 	bytes, err := message.Encode()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	msg := &ProtocolMsg{
@@ -233,7 +221,14 @@ func (fr *FROST) createAndBroadcastBlameOfInvalidMessage(peerOID uint32, message
 			BlamerSessionSk:  fr.state.sessionSK.Bytes(),
 		},
 	}
-	return fr.broadcastDKGMessage(msg)
+	signedMsg, err := fr.broadcastDKGMessage(msg)
+
+	return &dkg.ProtocolOutcome{
+		BlameOutput: &dkg.BlameOutput{
+			Valid:        true,
+			BlameMessage: signedMsg,
+		},
+	}, err
 }
 
 func (fr *FROST) haveSameRoot(existingMessage, newMessage *dkg.SignedMessage) bool {
