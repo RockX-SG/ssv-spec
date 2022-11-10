@@ -103,9 +103,9 @@ const (
 	InvalidShare
 	// FailedEcies refers to failing of decryption of encrypted share using ecies
 	FailedEcies
-	// InvalidScaler refers to sending invalid scaler values for ProofS & ProofR
-	InvalidScaler
-	// InvalidScaler refers to sending invalid commitment values
+	// InvalidScalar refers to sending invalid scaler values for ProofS & ProofR
+	InvalidScalar
+	// InvalidScalar refers to sending invalid commitment values
 	InvalidCommitment
 )
 
@@ -114,7 +114,7 @@ func (t BlameType) ToString() string {
 		InconsistentMessage: "Inconsistent Message",
 		InvalidShare:        "Invalid Share",
 		FailedEcies:         "Failed Ecies",
-		InvalidScaler:       "Invalid Scaler",
+		InvalidScalar:       "Invalid Scaler",
 		InvalidCommitment:   "Invalid Commitment",
 	}
 	return m[t]

@@ -21,7 +21,7 @@ var AllTests = []SpecTest{
 	frost.Resharing(),
 	frost.BlameHappyFlow()[fr.FailedEcies],
 	frost.BlameHappyFlow()[fr.InvalidCommitment],
-	frost.BlameHappyFlow()[fr.InvalidScaler],
+	frost.BlameHappyFlow()[fr.InvalidScalar],
 	frost.BlameTypeInvalidShare(),
 	frost.BlameTypeInconsistentMessage(),
 	tests.ResharingHappyFlow(),

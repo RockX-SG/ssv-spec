@@ -80,7 +80,7 @@ func BlameHappyFlow() map[frost.BlameType]*FrostSpecTest {
 
 	blameTypesToTest := []frost.BlameType{
 		frost.FailedEcies,
-		frost.InvalidScaler,
+		frost.InvalidScalar,
 		frost.InvalidCommitment,
 	}
 
@@ -237,7 +237,7 @@ func makeInvalid(t frost.BlameType, data []byte) []byte {
 	switch t {
 	case frost.FailedEcies:
 		return makeInvalidForFailedEcies(data)
-	case frost.InvalidScaler:
+	case frost.InvalidScalar:
 		return makeInvalidForInvalidScaler(data)
 	case frost.InvalidCommitment:
 		return makeInvalidForInvalidCommitment(data)
