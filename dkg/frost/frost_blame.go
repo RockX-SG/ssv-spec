@@ -2,7 +2,6 @@ package frost
 
 import (
 	"bytes"
-
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/coinbase/kryptology/pkg/sharing"
 	ecies "github.com/ecies/go/v2"
@@ -47,7 +46,9 @@ func (fr *FROST) processBlame() (*dkg.BlameOutput, error) {
 }
 
 func (fr *FROST) processBlameTypeInvalidShare(operatorID uint32, blameMessage *BlameMessage) (bool /*valid*/, error) {
-
+	if err := blameMessage.Validate(); err != nil {
+		return false, errors.Wrap(err, "invalid blame message")
+	}
 	if len(blameMessage.BlameData) != 1 {
 		return false, errors.New("invalid blame data")
 	}
@@ -119,6 +120,9 @@ func (fr *FROST) decodeMessage(data []byte) (*dkg.SignedMessage, *ProtocolMsg, e
 }
 
 func (fr *FROST) processBlameTypeInconsistentMessage(operatorID uint32, blameMessage *BlameMessage) (bool /*valid*/, error) {
+	if err := blameMessage.Validate(); err != nil {
+		return false, errors.Wrap(err, "invalid blame message")
+	}
 
 	if len(blameMessage.BlameData) != 2 {
 		return false, errors.New("invalid blame data")
@@ -156,6 +160,9 @@ func (fr *FROST) processBlameTypeInconsistentMessage(operatorID uint32, blameMes
 }
 
 func (fr *FROST) processBlameTypeInvalidMessage(operatorID uint32, blameMessage *BlameMessage) (bool /*valid*/, error) {
+	if err := blameMessage.Validate(); err != nil {
+		return false, errors.Wrap(err, "invalid blame message")
+	}
 	if len(blameMessage.BlameData) != 1 {
 		return false, errors.New("invalid blame data")
 	}

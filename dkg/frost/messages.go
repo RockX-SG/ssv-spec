@@ -2,6 +2,7 @@ package frost
 
 import (
 	"encoding/json"
+	"github.com/bloxapp/ssv-spec/dkg"
 	ecies "github.com/ecies/go/v2"
 	"github.com/pkg/errors"
 )
@@ -140,13 +141,6 @@ type Round2Message struct {
 	VkShare []byte
 }
 
-type BlameMessage struct {
-	Type             BlameType
-	TargetOperatorID uint32
-	BlameData        [][]byte // SignedMessages received from the bad participant
-	BlamerSessionSk  []byte
-}
-
 func (msg *Round2Message) Validate() error {
 	var err error
 	_, err = thisCurve.Point.FromAffineCompressed(msg.Vk)
@@ -156,6 +150,27 @@ func (msg *Round2Message) Validate() error {
 	_, err = thisCurve.Point.FromAffineCompressed(msg.VkShare)
 	if err != nil {
 		return errors.Wrap(err, "invalid vk share")
+	}
+	return nil
+}
+
+type BlameMessage struct {
+	Type             BlameType
+	TargetOperatorID uint32
+	BlameData        [][]byte // SignedMessages received from the bad participant
+	BlamerSessionSk  []byte
+}
+
+func (msg *BlameMessage) Validate() error {
+	if len(msg.BlameData) < 1 {
+		return errors.New("no blame data")
+	}
+	for _, datum := range msg.BlameData {
+		signedMsg := &dkg.SignedMessage{}
+		err := signedMsg.Decode(datum)
+		if err != nil {
+			return errors.Wrap(err, "contained data is not SignedMessage")
+		}
 	}
 	return nil
 }
