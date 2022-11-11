@@ -29,6 +29,9 @@ func (fr *FROST) processBlameTypeInvalidShare(blamerOID uint32, blameMessage *Bl
 		return false, errors.New("invalid blame data")
 	}
 	signedMessage, protocolMessage, err := fr.decodeMessage(blameMessage.BlameData[0])
+	if err != nil {
+		return false, errors.Wrap(err, "failed to decode signed message")
+	}
 
 	if err := fr.validateSignedMessage(signedMessage); err != nil {
 		return false, errors.Wrap(err, "failed to Validate signature for blame data")
