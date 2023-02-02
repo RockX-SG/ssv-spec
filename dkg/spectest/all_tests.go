@@ -32,5 +32,4 @@ var AllTests = []SpecTest{
 
 	keygen.InvalidRequestID(),
 	keygen.InvalidOperatorID(),
-	// keygen.MismatchRequestID(),
 }
