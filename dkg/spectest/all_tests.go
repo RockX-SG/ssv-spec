@@ -33,6 +33,7 @@ var AllTests = []SpecTest{
 	keygen.InvalidRequestID(),
 	keygen.InvalidOperatorID(),
 	keygen.InvalidThreshold(),
+	keygen.InvalidThreshold2(),
 	keygen.InvalidNumberOfOperators(),
 	keygen.FaileToDecodeProtocolMsg(),
 }
