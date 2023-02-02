@@ -32,4 +32,6 @@ var AllTests = []SpecTest{
 
 	keygen.InvalidRequestID(),
 	keygen.InvalidOperatorID(),
+	keygen.InvalidThreshold(),
+	keygen.InvalidNumberOfOperators(),
 }
