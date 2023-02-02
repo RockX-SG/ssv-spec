@@ -29,6 +29,8 @@ var AllTests = []SpecTest{
 	timeout.Timeout_Preparation(),
 	timeout.Timeout_Round1(),
 	timeout.Timeout_Round2(),
+
 	keygen.InvalidRequestID(),
 	keygen.InvalidOperatorID(),
+	// keygen.MismatchRequestID(),
 }
