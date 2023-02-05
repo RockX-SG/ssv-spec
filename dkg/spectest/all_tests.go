@@ -31,7 +31,7 @@ var AllTests = []SpecTest{
 	// blame.BlameTypeInvalidShare_HappyFlow(),
 	// blame.BlameTypeInvalidShare_FailedDecrypt_HappyFlow(),
 	blame.BlameTypeInvalidMessage_MsgsForMultipleRounds(),
-
+	blame.BlameTypeInvalidMessage_MsgMatchesRound(),
 	// timeout.Timeout_Preparation(),
 	// timeout.Timeout_Round1(),
 	// timeout.Timeout_Round2(),
