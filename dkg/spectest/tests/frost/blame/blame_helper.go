@@ -79,3 +79,12 @@ func makeInvalidForInvalidMessage_MsgMatchesRound(data1 *frost.PreparationMessag
 	d, _ := protocolMessage.Encode()
 	return d
 }
+
+func makeInvalidForInvalidMessage_HasZeroMsgs() []byte {
+	protocolMessage := &frost.ProtocolMsg{
+		Round: frost.Preparation,
+	}
+
+	d, _ := protocolMessage.Encode()
+	return d
+}
