@@ -39,7 +39,7 @@ func BlameTypeInvalidMessage_MsgMatchesRound() *tests.MsgProcessingSpecTest {
 	)
 
 	return &tests.MsgProcessingSpecTest{
-		Name:        "blame/invalid message/messages for multiple round",
+		Name:        "blame/invalid message/msg and round mismatch",
 		TestingNode: testingNode,
 		InputMessages: []*dkg.SignedMessage{
 			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{

@@ -39,7 +39,7 @@ func BlameTypeInvalidMessage_HasZeroMsgs() *tests.MsgProcessingSpecTest {
 	)
 
 	return &tests.MsgProcessingSpecTest{
-		Name:        "blame/invalid message/messages for multiple round",
+		Name:        "blame/invalid message/protocol msg is empty",
 		TestingNode: testingNode,
 		InputMessages: []*dkg.SignedMessage{
 			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
