@@ -25,37 +25,59 @@ func testSignedMessage(round ProtocolRound, operatorID types.OperatorID) *dkg.Si
 	case Round2:
 		msg.Data = Testing_Round2MessageBytes(operatorID, testingutils.KeygenMsgStore)
 	case Blame:
-		msg.Data = BlameMessageBytes(operatorID, InvalidMessage, nil)
+		msg.Data = Testing_BlameMessageBytes(operatorID, InvalidMessage, nil)
 	}
 	return testingutils.SignDKGMsg(sk, operatorID, msg)
 }
 
-func Testing_PreparationMessageBytes(id types.OperatorID, frMsgStore testingutils.FrostMsgStore) []byte {
-	pk, _ := hex.DecodeString(frMsgStore.SessionPKs[id])
-	msg := &ProtocolMsg{
+func Testing_PreparationMessageBytes(id types.OperatorID, frostMsgStore testingutils.FrostMsgStore) []byte {
+	encodedData, _ := Testing_PreparationMessage(id, frostMsgStore).Encode()
+	return encodedData
+}
+
+func Testing_Round1MessageBytes(id types.OperatorID, frostMsgStore testingutils.FrostMsgStore) []byte {
+	encodedData, _ := Testing_Round1Message(id, frostMsgStore).Encode()
+	return encodedData
+}
+
+func Testing_Round2MessageBytes(id types.OperatorID, frostMsgStore testingutils.FrostMsgStore) []byte {
+	encodedData, _ := Testing_Round2Message(id, frostMsgStore).Encode()
+	return encodedData
+}
+
+func Testing_BlameMessageBytes(id types.OperatorID, blameType BlameType, blameMessages []*dkg.SignedMessage) []byte {
+	encodedData, _ := Testing_BlameMessage(id, blameType, blameMessages).Encode()
+	return encodedData
+}
+func Testing_TimeoutMessageBytes(round ProtocolRound) []byte {
+	encodedData, _ := Testing_TimeoutMessage(round).Encode()
+	return encodedData
+}
+
+func Testing_PreparationMessage(id types.OperatorID, frostMsgStore testingutils.FrostMsgStore) *ProtocolMsg {
+	pk, _ := hex.DecodeString(frostMsgStore.SessionPKs[id])
+	return &ProtocolMsg{
 		Round: Preparation,
 		PreparationMessage: &PreparationMessage{
 			SessionPk: pk,
 		},
 	}
-	byts, _ := msg.Encode()
-	return byts
 }
 
-func Testing_Round1MessageBytes(id types.OperatorID, frMsgStore testingutils.FrostMsgStore) []byte {
+func Testing_Round1Message(id types.OperatorID, frostMsgStore testingutils.FrostMsgStore) *ProtocolMsg {
 	commitments := make([][]byte, 0)
-	for _, commitment := range frMsgStore.Round1[id].Commitments {
+	for _, commitment := range frostMsgStore.Round1[id].Commitments {
 		cbytes, _ := hex.DecodeString(commitment)
 		commitments = append(commitments, cbytes)
 	}
-	proofS, _ := hex.DecodeString(frMsgStore.Round1[id].ProofS)
-	proofR, _ := hex.DecodeString(frMsgStore.Round1[id].ProofR)
+	proofS, _ := hex.DecodeString(frostMsgStore.Round1[id].ProofS)
+	proofR, _ := hex.DecodeString(frostMsgStore.Round1[id].ProofR)
 	shares := map[uint32][]byte{}
-	for peerID, share := range frMsgStore.Round1[id].Shares {
+	for peerID, share := range frostMsgStore.Round1[id].Shares {
 		shareBytes, _ := hex.DecodeString(share)
 		shares[peerID] = shareBytes
 	}
-	msg := ProtocolMsg{
+	return &ProtocolMsg{
 		Round: Round1,
 		Round1Message: &Round1Message{
 			Commitment: commitments,
@@ -64,25 +86,21 @@ func Testing_Round1MessageBytes(id types.OperatorID, frMsgStore testingutils.Fro
 			Shares:     shares,
 		},
 	}
-	byts, _ := msg.Encode()
-	return byts
 }
 
-func Testing_Round2MessageBytes(id types.OperatorID, frMsgStore testingutils.FrostMsgStore) []byte {
-	vk, _ := hex.DecodeString(frMsgStore.Round2[id].Vk)
-	vkshare, _ := hex.DecodeString(frMsgStore.Round2[id].VkShare)
-	msg := ProtocolMsg{
+func Testing_Round2Message(id types.OperatorID, frostMsgStore testingutils.FrostMsgStore) *ProtocolMsg {
+	vk, _ := hex.DecodeString(frostMsgStore.Round2[id].Vk)
+	vkshare, _ := hex.DecodeString(frostMsgStore.Round2[id].VkShare)
+	return &ProtocolMsg{
 		Round: Round2,
 		Round2Message: &Round2Message{
 			Vk:      vk,
 			VkShare: vkshare,
 		},
 	}
-	byts, _ := msg.Encode()
-	return byts
 }
 
-func BlameMessageBytes(id types.OperatorID, blameType BlameType, blameMessages []*dkg.SignedMessage) []byte {
+func Testing_BlameMessage(id types.OperatorID, blameType BlameType, blameMessages []*dkg.SignedMessage) *ProtocolMsg {
 	blameData := make([][]byte, 0)
 	for _, blameMessage := range blameMessages {
 		byts, _ := blameMessage.Encode()
@@ -92,7 +110,7 @@ func BlameMessageBytes(id types.OperatorID, blameType BlameType, blameMessages [
 	skBytes, _ := hex.DecodeString(testingutils.KeygenMsgStore.SessionSKs[1])
 	sk := ecies.NewPrivateKeyFromBytes(skBytes)
 
-	ret, _ := (&ProtocolMsg{
+	return &ProtocolMsg{
 		Round: Blame,
 		BlameMessage: &BlameMessage{
 			Type:             blameType,
@@ -100,16 +118,14 @@ func BlameMessageBytes(id types.OperatorID, blameType BlameType, blameMessages [
 			BlameData:        blameData,
 			BlamerSessionSk:  sk.Bytes(),
 		},
-	}).Encode()
-	return ret
+	}
 }
 
-func Testing_TimeoutMessageBytes(round ProtocolRound) []byte {
-	ret, _ := (&ProtocolMsg{
+func Testing_TimeoutMessage(round ProtocolRound) *ProtocolMsg {
+	return &ProtocolMsg{
 		Round: Timeout,
 		TimeoutMessage: &TimeoutMessage{
 			Round: round,
 		},
-	}).Encode()
-	return ret
+	}
 }

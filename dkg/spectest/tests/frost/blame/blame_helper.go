@@ -58,3 +58,33 @@ func makeInvalidForInvalidShare_FailedDecrypt(data []byte) []byte {
 	d, _ := protocolMessage.Encode()
 	return d
 }
+
+func makeInvalidForInvalidMessage_MsgsForMultipleRound(data1 *frost.PreparationMessage, data2 *frost.Round1Message) []byte {
+	protocolMessage := &frost.ProtocolMsg{
+		Round:              frost.Preparation,
+		PreparationMessage: data1,
+		Round1Message:      data2,
+	}
+
+	d, _ := protocolMessage.Encode()
+	return d
+}
+
+func makeInvalidForInvalidMessage_MsgMatchesRound(data1 *frost.PreparationMessage) []byte {
+	protocolMessage := &frost.ProtocolMsg{
+		Round:              frost.Round1,
+		PreparationMessage: data1,
+	}
+
+	d, _ := protocolMessage.Encode()
+	return d
+}
+
+func makeInvalidForInvalidMessage_HasZeroMsgs() []byte {
+	protocolMessage := &frost.ProtocolMsg{
+		Round: frost.Preparation,
+	}
+
+	d, _ := protocolMessage.Encode()
+	return d
+}

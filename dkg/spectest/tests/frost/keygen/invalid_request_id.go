@@ -1,4 +1,4 @@
-package blame
+package keygen
 
 import (
 	"github.com/bloxapp/ssv-spec/dkg"
@@ -8,19 +8,22 @@ import (
 	"github.com/bloxapp/ssv-spec/types/testingutils"
 )
 
-func BlameTypeInvalidCommitment_HappyFlow() *tests.MsgProcessingSpecTest {
+func InvalidRequestID() *tests.MsgProcessingSpecTest {
 	ks := testingutils.TestingKeygenKeySet()
 	network := testingutils.NewTestingNetwork()
 	storage := testingutils.NewTestingStorage()
 	keyManager := testingutils.NewTestingKeyManager()
 
 	identifier := dkg.NewRequestID(ks.DKGOperators[1].ETHAddress, 1)
-	initBytes := testingutils.InitMessageDataBytes(
+	anotherRequestID := testingutils.GetRandRequestID()
+
+	init := testingutils.InitMessageData(
 		[]types.OperatorID{1, 2, 3, 4},
 		uint16(ks.Threshold),
 		testingutils.TestingWithdrawalCredentials,
 		testingutils.TestingForkVersion,
 	)
+	initBytes, _ := init.Encode()
 
 	testingNode := dkg.NewNode(
 		&dkg.Operator{
@@ -39,7 +42,7 @@ func BlameTypeInvalidCommitment_HappyFlow() *tests.MsgProcessingSpecTest {
 	)
 
 	return &tests.MsgProcessingSpecTest{
-		Name:        "blame/invalid commitment/happy flow",
+		Name:        "keygen/invalid-request-id",
 		TestingNode: testingNode,
 		InputMessages: []*dkg.SignedMessage{
 			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
@@ -49,23 +52,8 @@ func BlameTypeInvalidCommitment_HappyFlow() *tests.MsgProcessingSpecTest {
 			}),
 			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
-				Identifier: identifier,
+				Identifier: anotherRequestID,
 				Data:       frost.Testing_PreparationMessageBytes(2, testingutils.KeygenMsgStore),
-			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[3].SK, 3, &dkg.Message{
-				MsgType:    dkg.ProtocolMsgType,
-				Identifier: identifier,
-				Data:       frost.Testing_PreparationMessageBytes(3, testingutils.KeygenMsgStore),
-			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[4].SK, 4, &dkg.Message{
-				MsgType:    dkg.ProtocolMsgType,
-				Identifier: identifier,
-				Data:       frost.Testing_PreparationMessageBytes(4, testingutils.KeygenMsgStore),
-			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
-				MsgType:    dkg.ProtocolMsgType,
-				Identifier: identifier,
-				Data:       makeInvalidForInvalidCommitment(frost.Testing_Round1MessageBytes(2, testingutils.KeygenMsgStore)),
 			}),
 		},
 		OutputMessages: []*dkg.SignedMessage{
@@ -74,25 +62,9 @@ func BlameTypeInvalidCommitment_HappyFlow() *tests.MsgProcessingSpecTest {
 				Identifier: identifier,
 				Data:       frost.Testing_PreparationMessageBytes(1, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
-				MsgType:    dkg.ProtocolMsgType,
-				Identifier: identifier,
-				Data:       frost.Testing_Round1MessageBytes(1, testingutils.KeygenMsgStore),
-			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
-				MsgType:    dkg.ProtocolMsgType,
-				Identifier: identifier,
-				Data: frost.Testing_BlameMessageBytes(2, frost.InvalidMessage, []*dkg.SignedMessage{
-					testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
-						MsgType:    dkg.ProtocolMsgType,
-						Identifier: identifier,
-						Data:       makeInvalidForInvalidCommitment(frost.Testing_Round1MessageBytes(2, testingutils.KeygenMsgStore)),
-					}),
-				}),
-			}),
 		},
 		Output:        map[types.OperatorID]*dkg.SignedOutput{},
 		KeySet:        ks,
-		ExpectedError: "",
+		ExpectedError: "could not find dkg runner",
 	}
 }

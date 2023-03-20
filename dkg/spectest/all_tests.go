@@ -19,12 +19,23 @@ var AllTests = []SpecTest{
 	// tests.ResharingHappyFlow(),
 
 	keygen.HappyFlow(),
+	keygen.InvalidRequestID(),
+	keygen.InvalidOperatorID(),
+	keygen.InvalidThreshold(),
+	keygen.InvalidThreshold2(),
+	keygen.InvalidNumberOfOperators(),
+	keygen.FaileToDecodeProtocolMsg(),
+
 	resharing.HappyFlow(),
+
 	blame.BlameTypeInvalidCommitment_HappyFlow(),
 	blame.BlameTypeInvalidScalar_HappyFlow(),
 	blame.BlameTypeInconsistentMessage_HappyFlow(),
 	blame.BlameTypeInvalidShare_HappyFlow(),
 	blame.BlameTypeInvalidShare_FailedDecrypt_HappyFlow(),
+	blame.BlameTypeInvalidMessage_MsgsForMultipleRounds(),
+	blame.BlameTypeInvalidMessage_MsgMatchesRound(),
+	blame.BlameTypeInvalidMessage_HasZeroMsgs(),
 
 	timeout.Timeout_Preparation(),
 	timeout.Timeout_Round1(),
