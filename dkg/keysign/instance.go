@@ -6,7 +6,6 @@ import (
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/dkg/common"
 	"github.com/bloxapp/ssv-spec/types"
-	"github.com/coinbase/kryptology/pkg/core/curves"
 	ethcommon "github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/herumi/bls-eth-go-binary/bls"
@@ -14,7 +13,6 @@ import (
 )
 
 var (
-	thisCurve  = curves.BLS12381G1()
 	domainType = types.PrimusTestnet
 	sigType    = types.DKGSignatureType
 )

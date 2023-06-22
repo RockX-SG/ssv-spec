@@ -10,8 +10,6 @@ import (
 	ecies "github.com/ecies/go/v2"
 )
 
-var testProtocolRound = common.Preparation
-
 func testSignedMessage(round common.ProtocolRound, operatorID types.OperatorID) *dkg.SignedMessage {
 	sk := testingutils.TestingKeygenKeySet().DKGOperators[operatorID].SK
 	msg := &dkg.Message{

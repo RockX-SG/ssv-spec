@@ -16,7 +16,7 @@ func HappyFlow() *tests.MsgProcessingSpecTest {
 	storage := testingutils.NewTestingStorage()
 	keyManager := testingutils.NewTestingKeyManager()
 
-	storage.SaveKeyGenOutput(&dkg.KeyGenOutput{
+	_ = storage.SaveKeyGenOutput(&dkg.KeyGenOutput{
 		Share:       ks.Shares[1],
 		ValidatorPK: ks.ValidatorPK.Serialize(),
 		Threshold:   ks.Threshold,
