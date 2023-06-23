@@ -2,12 +2,15 @@ package dkg
 
 import (
 	"github.com/bloxapp/ssv-spec/types"
+	"github.com/ethereum/go-ethereum/accounts/abi"
+	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/pkg/errors"
 )
 
 type ProtocolOutcome struct {
 	ProtocolOutput *KeyGenOutput
+	KeySignOutput  *KeySignOutput
 	BlameOutput    *BlameOutput
 }
 
@@ -27,6 +30,33 @@ type KeyGenOutput struct {
 	OperatorPubKeys map[types.OperatorID]*bls.PublicKey
 	ValidatorPK     types.ValidatorPK
 	Threshold       uint64
+}
+
+// KeySignOutput is the output of signature protocol
+type KeySignOutput struct {
+	RequestID   RequestID
+	Signature   []byte
+	ValidatorPK types.ValidatorPK
+}
+
+func (o *KeySignOutput) GetRoot() ([]byte, error) {
+	bytesSolidity, _ := abi.NewType("bytes", "", nil)
+	arguments := abi.Arguments{
+		{
+			Type: bytesSolidity,
+		},
+		{
+			Type: bytesSolidity,
+		},
+	}
+	bytes, err := arguments.Pack(
+		[]byte(o.ValidatorPK),
+		[]byte(o.Signature),
+	)
+	if err != nil {
+		return nil, err
+	}
+	return crypto.Keccak256(bytes), nil
 }
 
 // BlameOutput is the output of blame round

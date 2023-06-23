@@ -2,6 +2,7 @@ package dkg
 
 import (
 	"encoding/hex"
+	"fmt"
 
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/pkg/errors"
@@ -90,6 +91,41 @@ func (n *Node) newResharingRunner(id RequestID, reshareMsg *Reshare) (Runner, er
 	return r, nil
 }
 
+func (n *Node) newSignatureRunner(id RequestID, keySign *KeySign) (Runner, error) {
+	keygenOutput, err := n.config.GetStorage().GetKeyGenOutput(keySign.ValidatorPK)
+	if err != nil {
+		return nil, fmt.Errorf("failed to retrieve secret keyshare for given validator pk: %s", err.Error())
+	}
+
+	operators := make([]uint32, 0)
+	for operatorID := range keygenOutput.OperatorPubKeys {
+		operators = append(operators, uint32(operatorID))
+	}
+
+	keySign.Operators = operators
+	keySign.Threshold = keygenOutput.Threshold
+	keySign.SecretShare = keygenOutput.Share
+	keySign.OperatorPublicKeyshares = keygenOutput.OperatorPubKeys
+
+	r := &runner{
+		Operator:              n.operator,
+		KeySign:               keySign,
+		Identifier:            id,
+		KeygenOutcome:         nil,
+		DepositDataRoot:       nil,
+		DepositDataSignatures: map[types.OperatorID]*PartialDepositData{},
+		OutputMsgs:            map[types.OperatorID]*SignedOutput{},
+		protocol:              n.config.KeySign(id, n.operator.OperatorID, n.config, keySign),
+		config:                n.config,
+	}
+
+	if err := r.protocol.Start(); err != nil {
+		return nil, errors.Wrap(err, "could not start keysign protocol")
+	}
+
+	return r, nil
+}
+
 // ProcessMessage processes network Messages of all types
 func (n *Node) ProcessMessage(msg *types.SSVMessage) error {
 	if msg.MsgType != types.DKGMsgType {
@@ -109,6 +145,8 @@ func (n *Node) ProcessMessage(msg *types.SSVMessage) error {
 		return n.startNewDKGMsg(signedMsg)
 	case ReshareMsgType:
 		return n.startResharing(signedMsg)
+	case KeySignMsgType:
+		return n.startKeySign(signedMsg)
 	case ProtocolMsgType:
 		return n.processDKGMsg(signedMsg)
 	case DepositDataMsgType:
@@ -152,6 +190,23 @@ func (n *Node) startResharing(message *SignedMessage) error {
 	}
 
 	r, err := n.newResharingRunner(message.Message.Identifier, reshareMsg)
+	if err != nil {
+		return errors.Wrap(err, "could not start resharing")
+	}
+
+	// add runner to runners
+	n.runners.AddRunner(message.Message.Identifier, r)
+
+	return nil
+}
+
+func (n *Node) startKeySign(message *SignedMessage) error {
+	keySign, err := n.validateKeySignMsg(message)
+	if err != nil {
+		return errors.Wrap(err, "could not start resharing")
+	}
+
+	r, err := n.newSignatureRunner(message.Message.Identifier, keySign)
 	if err != nil {
 		return errors.Wrap(err, "could not start resharing")
 	}
@@ -206,6 +261,29 @@ func (n *Node) validateReshareMsg(message *SignedMessage) (*Reshare, error) {
 	}
 
 	return reshareMsg, nil
+}
+
+func (n *Node) validateKeySignMsg(message *SignedMessage) (*KeySign, error) {
+	// validate identifier.GetEthAddress is the signer for message
+	if err := message.Signature.ECRecover(message, n.config.SignatureDomainType, types.DKGSignatureType, message.Message.Identifier.GetETHAddress()); err != nil {
+		return nil, errors.Wrap(err, "signed message invalid")
+	}
+
+	keySign := &KeySign{}
+	if err := keySign.Decode(message.Message.Data); err != nil {
+		return nil, errors.Wrap(err, "could not get validator exit msg params from signed message")
+	}
+
+	if err := keySign.Validate(); err != nil {
+		return nil, errors.Wrap(err, "reshare message invalid")
+	}
+
+	// check instance not running already
+	if n.runners.RunnerForID(message.Message.Identifier) != nil {
+		return nil, errors.New("signature protocol started already")
+	}
+
+	return keySign, nil
 }
 
 func (n *Node) processDKGMsg(message *SignedMessage) error {

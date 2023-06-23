@@ -11,6 +11,7 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
+	"github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/pkg/errors"
 )
 
@@ -58,6 +59,8 @@ const (
 	OutputMsgType
 	// ReshareMsgType sent when Resharing is requested
 	ReshareMsgType
+	// KeySignMsgType sent when Presigned Voluntary Exit Message is Requested
+	KeySignMsgType
 )
 
 type Message struct {
@@ -277,6 +280,8 @@ type SignedOutput struct {
 	BlameData *BlameData
 	// Data signed
 	Data *Output
+	// KeySign Output signed
+	KeySignData *KeySignOutput
 	// Signer Operator ID which signed
 	Signer types.OperatorID
 	// Signature over Data.GetRoot()
@@ -355,5 +360,30 @@ func (msg *PartialDepositData) Encode() ([]byte, error) {
 
 // Decode returns error if decoding failed
 func (msg *PartialDepositData) Decode(data []byte) error {
+	return json.Unmarshal(data, msg)
+}
+
+// KeySign triggers the signature protocol for signing validator exit message
+type KeySign struct {
+	ValidatorPK types.ValidatorPK
+	SigningRoot []byte
+
+	Operators               []uint32
+	Threshold               uint64
+	SecretShare             *bls.SecretKey
+	OperatorPublicKeyshares map[types.OperatorID]*bls.PublicKey
+}
+
+func (msg *KeySign) Validate() error {
+	return nil
+}
+
+// Encode returns a msg encoded bytes or error
+func (msg *KeySign) Encode() ([]byte, error) {
+	return json.Marshal(msg)
+}
+
+// Decode returns error if decoding failed
+func (msg *KeySign) Decode(data []byte) error {
 	return json.Unmarshal(data, msg)
 }
