@@ -49,6 +49,7 @@ func (test *MsgProcessingSpecTest) Run(t *testing.T) {
 		})
 
 		if err != nil {
+			t.Logf("node failed to process msg at idx %d with err: %s", idx, err)
 			lastErr = err
 		}
 	}

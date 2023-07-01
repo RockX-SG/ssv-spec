@@ -45,9 +45,10 @@ func HappyFlow() *tests.MsgProcessingSpecTest {
 
 	testingNode := dkg.NewNode(
 		&dkg.Operator{
-			OperatorID:       1,
-			ETHAddress:       ks.DKGOperators[1].ETHAddress,
-			EncryptionPubKey: &ks.DKGOperators[1].EncryptionKey.PublicKey,
+			OperatorID:           1,
+			ETHAddress:           ks.DKGOperators[1].ETHAddress,
+			EncryptionPubKey:     &ks.DKGOperators[1].EncryptionKey.PublicKey,
+			EncryptionPrivateKey: ks.DKGOperators[1].EncryptionKey,
 		},
 		&dkg.Config{
 			KeygenProtocol:      frost.New,
@@ -64,69 +65,69 @@ func HappyFlow() *tests.MsgProcessingSpecTest {
 		Name:        "keysign/happy flow",
 		TestingNode: testingNode,
 		InputMessages: []*dkg.SignedMessage{
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.KeySignMsgType,
 				Identifier: identifier,
 				Data:       initBytes,
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[2].EncryptionKey, 2, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       keysign.Testing_PreparationMessageBytes(2, ks, signingRoot),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[3].SK, 3, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[3].EncryptionKey, 3, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       keysign.Testing_PreparationMessageBytes(3, ks, signingRoot),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[4].SK, 4, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[4].EncryptionKey, 4, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       keysign.Testing_PreparationMessageBytes(4, ks, signingRoot),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[2].EncryptionKey, 2, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       keysign.Testing_Round1MessageBytes(2, ks, signingRoot),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[3].SK, 3, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[3].EncryptionKey, 3, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       keysign.Testing_Round1MessageBytes(3, ks, signingRoot),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[4].SK, 4, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[4].EncryptionKey, 4, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       keysign.Testing_Round1MessageBytes(4, ks, signingRoot),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[2].EncryptionKey, 2, &dkg.Message{
 				MsgType:    dkg.OutputMsgType,
 				Identifier: identifier,
 				Data:       ks.SignedKeySignOutputBytes(identifier, 2, signingRoot),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[3].SK, 3, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[3].EncryptionKey, 3, &dkg.Message{
 				MsgType:    dkg.OutputMsgType,
 				Identifier: identifier,
 				Data:       ks.SignedKeySignOutputBytes(identifier, 3, signingRoot),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[4].SK, 4, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[4].EncryptionKey, 4, &dkg.Message{
 				MsgType:    dkg.OutputMsgType,
 				Identifier: identifier,
 				Data:       ks.SignedKeySignOutputBytes(identifier, 4, signingRoot),
 			}),
 		},
 		OutputMessages: []*dkg.SignedMessage{
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       keysign.Testing_PreparationMessageBytes(1, ks, signingRoot),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       keysign.Testing_Round1MessageBytes(1, ks, signingRoot),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.OutputMsgType,
 				Identifier: identifier,
 				Data:       ks.SignedKeySignOutputBytes(identifier, 1, signingRoot),

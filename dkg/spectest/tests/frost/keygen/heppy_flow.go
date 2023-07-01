@@ -26,9 +26,10 @@ func HappyFlow() *tests.MsgProcessingSpecTest {
 
 	testingNode := dkg.NewNode(
 		&dkg.Operator{
-			OperatorID:       1,
-			ETHAddress:       ks.DKGOperators[1].ETHAddress,
-			EncryptionPubKey: &ks.DKGOperators[1].EncryptionKey.PublicKey,
+			OperatorID:           1,
+			ETHAddress:           ks.DKGOperators[1].ETHAddress,
+			EncryptionPubKey:     &ks.DKGOperators[1].EncryptionKey.PublicKey,
+			EncryptionPrivateKey: ks.DKGOperators[1].EncryptionKey,
 		},
 		&dkg.Config{
 			KeygenProtocol:      frost.New,
@@ -44,109 +45,109 @@ func HappyFlow() *tests.MsgProcessingSpecTest {
 		Name:        "keygen/happy flow",
 		TestingNode: testingNode,
 		InputMessages: []*dkg.SignedMessage{
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.InitMsgType,
 				Identifier: identifier,
 				Data:       initBytes,
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[2].EncryptionKey, 2, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_PreparationMessageBytes(2, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[3].SK, 3, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[3].EncryptionKey, 3, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_PreparationMessageBytes(3, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[4].SK, 4, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[4].EncryptionKey, 4, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_PreparationMessageBytes(4, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[2].EncryptionKey, 2, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_Round1MessageBytes(2, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[3].SK, 3, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[3].EncryptionKey, 3, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_Round1MessageBytes(3, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[4].SK, 4, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[4].EncryptionKey, 4, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_Round1MessageBytes(4, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[2].EncryptionKey, 2, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_Round2MessageBytes(2, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[3].SK, 3, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[3].EncryptionKey, 3, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_Round2MessageBytes(3, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[4].SK, 4, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[4].EncryptionKey, 4, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_Round2MessageBytes(4, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[2].EncryptionKey, 2, &dkg.Message{
 				MsgType:    dkg.DepositDataMsgType,
 				Identifier: identifier,
 				Data:       testingutils.PartialDepositDataBytes(2, root, ks.Shares[2]),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[3].SK, 3, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[3].EncryptionKey, 3, &dkg.Message{
 				MsgType:    dkg.DepositDataMsgType,
 				Identifier: identifier,
 				Data:       testingutils.PartialDepositDataBytes(3, root, ks.Shares[3]),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[4].SK, 4, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[4].EncryptionKey, 4, &dkg.Message{
 				MsgType:    dkg.DepositDataMsgType,
 				Identifier: identifier,
 				Data:       testingutils.PartialDepositDataBytes(4, root, ks.Shares[4]),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[2].EncryptionKey, 2, &dkg.Message{
 				MsgType:    dkg.OutputMsgType,
 				Identifier: identifier,
 				Data:       ks.SignedOutputBytes(identifier, 2, root),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[3].SK, 3, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[3].EncryptionKey, 3, &dkg.Message{
 				MsgType:    dkg.OutputMsgType,
 				Identifier: identifier,
 				Data:       ks.SignedOutputBytes(identifier, 3, root),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[4].SK, 4, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[4].EncryptionKey, 4, &dkg.Message{
 				MsgType:    dkg.OutputMsgType,
 				Identifier: identifier,
 				Data:       ks.SignedOutputBytes(identifier, 4, root),
 			}),
 		},
 		OutputMessages: []*dkg.SignedMessage{
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_PreparationMessageBytes(1, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_Round1MessageBytes(1, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_Round2MessageBytes(1, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.DepositDataMsgType,
 				Identifier: identifier,
 				Data:       testingutils.PartialDepositDataBytes(1, root, ks.Shares[1]),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.OutputMsgType,
 				Identifier: identifier,
 				Data:       ks.SignedOutputBytes(identifier, 1, root),

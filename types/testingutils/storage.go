@@ -20,9 +20,10 @@ func NewTestingStorage() *testingStorage {
 
 	for i, s := range Testing13SharesSet().DKGOperators {
 		ret.operators[i] = &dkg.Operator{
-			OperatorID:       i,
-			ETHAddress:       s.ETHAddress,
-			EncryptionPubKey: &s.EncryptionKey.PublicKey,
+			OperatorID:           i,
+			ETHAddress:           s.ETHAddress,
+			EncryptionPubKey:     &s.EncryptionKey.PublicKey,
+			EncryptionPrivateKey: s.EncryptionKey,
 		}
 	}
 

@@ -5,7 +5,6 @@ import (
 	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/herumi/bls-eth-go-binary/bls"
-	"github.com/pkg/errors"
 )
 
 type ProtocolOutcome struct {
@@ -14,14 +13,26 @@ type ProtocolOutcome struct {
 	BlameOutput    *BlameOutput
 }
 
-func (o *ProtocolOutcome) IsFailedWithBlame() (bool, error) {
-	if o.ProtocolOutput == nil && o.BlameOutput == nil {
-		return false, errors.New("invalid outcome - missing KeyGenOutput and BlameOutput")
-	}
-	if o.ProtocolOutput != nil && o.BlameOutput != nil {
-		return false, errors.New("invalid outcome - has both KeyGenOutput and BlameOutput")
-	}
-	return o.BlameOutput != nil, nil
+func (o *ProtocolOutcome) IsFinishedWithKeygen() bool {
+	return o.ProtocolOutput != nil
+}
+
+func (o *ProtocolOutcome) IsFinishedWithKeySign() bool {
+	return o.KeySignOutput != nil
+}
+
+func (o *ProtocolOutcome) IsFailedWithBlame() bool {
+	return o.BlameOutput != nil
+}
+
+func (o *ProtocolOutcome) isValid() bool {
+	a := o.ProtocolOutput
+	b := o.KeySignOutput
+	c := o.BlameOutput
+	hasA := a != nil && b == nil && c == nil
+	hasB := a == nil && b != nil && c == nil
+	hasC := a == nil && b == nil && c != nil
+	return hasA || hasB || hasC
 }
 
 // KeyGenOutput is the bare minimum output from the protocol

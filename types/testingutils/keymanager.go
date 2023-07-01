@@ -5,13 +5,11 @@ import (
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/hex"
-	"fmt"
 
 	"github.com/attestantio/go-eth2-client/spec/bellatrix"
 	spec "github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	ssz "github.com/ferranbt/fastssz"
 	"github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/pkg/errors"
@@ -129,20 +127,12 @@ func (km *testingKeyManager) Encrypt(pk *rsa.PublicKey, data []byte) ([]byte, er
 }
 
 // SignDKGOutput signs output according to the SIP https://docs.google.com/document/d/1TRVUHjFyxINWW2H9FYLNL2pQoLy6gmvaI62KL_4cREQ/edit
-func (km *testingKeyManager) SignDKGOutput(output types.Root, address common.Address) (types.Signature, error) {
+func (km *testingKeyManager) SignDKGOutput(output types.Root, sk *rsa.PrivateKey) ([]byte, error) {
 	root, err := types.ComputeSigningRoot(output, types.ComputeSignatureDomain(km.domain, types.DKGSignatureType))
 	if err != nil {
 		return nil, err
 	}
-	sk := km.ecdsaKeys[address.String()]
-	if sk == nil {
-		return nil, errors.New(fmt.Sprintf("unable to find ecdsa key for address %v", address.String()))
-	}
-	sig, err := crypto.Sign(root, sk)
-	if err != nil {
-		return nil, err
-	}
-	return sig, nil
+	return types.Sign(sk, root)
 }
 
 func (km *testingKeyManager) SignETHDepositRoot(root []byte, address common.Address) (types.Signature, error) {

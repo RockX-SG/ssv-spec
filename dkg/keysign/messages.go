@@ -2,6 +2,7 @@ package keysign
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/dkg/common"
@@ -74,10 +75,13 @@ func (msg *ProtocolMsg) ToSignedMessage(id dkg.RequestID, operatorID types.Opera
 		return nil, err
 	}
 	if !exist {
-		return nil, errors.Errorf("operator with id %d not found", operatorID)
+		return nil, fmt.Errorf("operator with id %d not found", operatorID)
+	}
+	if operator.EncryptionPrivateKey == nil {
+		return nil, fmt.Errorf("failed to retrieve operator's private key for signature: %w", err)
 	}
 
-	sig, err := signer.SignDKGOutput(bcastMessage, operator.ETHAddress)
+	sig, err := signer.SignDKGOutput(bcastMessage, operator.EncryptionPrivateKey)
 	if err != nil {
 		return nil, err
 	}

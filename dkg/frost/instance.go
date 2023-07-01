@@ -9,8 +9,6 @@ import (
 	"github.com/coinbase/kryptology/pkg/core/curves"
 	"github.com/coinbase/kryptology/pkg/dkg/frost"
 	ecies "github.com/ecies/go/v2"
-	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/pkg/errors"
 )
 
@@ -211,13 +209,7 @@ func (fr *Instance) validateSignedMessage(msg *dkg.SignedMessage) error {
 		return errors.Wrap(err, "failed to get root")
 	}
 
-	pk, err := crypto.Ecrecover(root, msg.Signature)
-	if err != nil {
-		return errors.Wrap(err, "unable to recover public key")
-	}
-
-	addr := ethcommon.BytesToAddress(crypto.Keccak256(pk[1:])[12:])
-	if addr != operator.ETHAddress {
+	if !types.Verify(operator.EncryptionPubKey, root, msg.Signature) {
 		return errors.New("invalid signature")
 	}
 	return nil

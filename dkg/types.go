@@ -32,6 +32,8 @@ type Operator struct {
 	ETHAddress common.Address
 	// EncryptionPubKey encryption pubkey for shares
 	EncryptionPubKey *rsa.PublicKey
+	// EncryptionPrivateKey encryption private key for signing dkg message
+	EncryptionPrivateKey *rsa.PrivateKey
 }
 
 type IConfig interface {

@@ -11,7 +11,7 @@ import (
 )
 
 func testSignedMessage(round common.ProtocolRound, operatorID types.OperatorID) *dkg.SignedMessage {
-	sk := testingutils.TestingKeygenKeySet().DKGOperators[operatorID].SK
+	sk := testingutils.TestingKeygenKeySet().DKGOperators[operatorID].EncryptionKey
 	msg := &dkg.Message{
 		MsgType:    dkg.ProtocolMsgType,
 		Identifier: dkg.NewRequestID(testingutils.TestingKeygenKeySet().DKGOperators[operatorID].ETHAddress, uint32(operatorID)),

@@ -1,10 +1,13 @@
 package types
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/sha256"
 	"crypto/x509"
 	"encoding/pem"
+
 	"github.com/pkg/errors"
 )
 
@@ -43,6 +46,21 @@ func Encrypt(pk *rsa.PublicKey, plainText []byte) ([]byte, error) {
 		return nil, errors.Wrap(err, "Failed to decrypt key")
 	}
 	return encrypted, nil
+}
+
+func Sign(sk *rsa.PrivateKey, data []byte) ([]byte, error) {
+	hashed := sha256.Sum256(data)
+	signature, err := rsa.SignPKCS1v15(rand.Reader, sk, crypto.SHA256, hashed[:])
+	if err != nil {
+		return nil, err
+	}
+	return signature, nil
+}
+
+func Verify(pk *rsa.PublicKey, data, signature []byte) bool {
+	hashed := sha256.Sum256(data)
+	err := rsa.VerifyPKCS1v15(pk, crypto.SHA256, hashed[:], signature)
+	return err == nil
 }
 
 // PemToPrivateKey return rsa private key from pem
