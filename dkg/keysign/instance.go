@@ -6,8 +6,6 @@ import (
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/dkg/common"
 	"github.com/bloxapp/ssv-spec/types"
-	ethcommon "github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/herumi/bls-eth-go-binary/bls"
 	"github.com/pkg/errors"
 )
@@ -107,7 +105,7 @@ func (instance *Instance) ProcessMsg(msg *dkg.SignedMessage) (finished bool, pro
 
 	_, err = instance.state.msgContainer.SaveMsg(protocolMessage.Round, msg)
 	if err != nil {
-		return true, nil, err // message already exists or err with saving msg
+		return false, nil, err // message already exists or err with saving msg
 	}
 
 	switch protocolMessage.Round {
@@ -116,7 +114,7 @@ func (instance *Instance) ProcessMsg(msg *dkg.SignedMessage) (finished bool, pro
 	case common.Round1:
 		return instance.processKeysignOutput()
 	default:
-		return true, nil, dkg.ErrInvalidRound{}
+		return false, nil, dkg.ErrInvalidRound{}
 	}
 }
 
@@ -148,13 +146,7 @@ func (instance *Instance) validateSignedMessage(msg *dkg.SignedMessage) error {
 		return errors.Wrap(err, "failed to get root")
 	}
 
-	pk, err := crypto.Ecrecover(root, msg.Signature)
-	if err != nil {
-		return errors.Wrap(err, "unable to recover public key")
-	}
-
-	addr := ethcommon.BytesToAddress(crypto.Keccak256(pk[1:])[12:])
-	if addr != operator.ETHAddress {
+	if !types.Verify(operator.EncryptionPubKey, root, msg.Signature) {
 		return errors.New("invalid signature")
 	}
 	return nil

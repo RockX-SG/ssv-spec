@@ -24,9 +24,10 @@ func BlameTypeInvalidScalar_HappyFlow() *tests.MsgProcessingSpecTest {
 
 	testingNode := dkg.NewNode(
 		&dkg.Operator{
-			OperatorID:       1,
-			ETHAddress:       ks.DKGOperators[1].ETHAddress,
-			EncryptionPubKey: &ks.DKGOperators[1].EncryptionKey.PublicKey,
+			OperatorID:           1,
+			ETHAddress:           ks.DKGOperators[1].ETHAddress,
+			EncryptionPubKey:     &ks.DKGOperators[1].EncryptionKey.PublicKey,
+			EncryptionPrivateKey: ks.DKGOperators[1].EncryptionKey,
 		},
 		&dkg.Config{
 			KeygenProtocol:      frost.New,
@@ -42,48 +43,48 @@ func BlameTypeInvalidScalar_HappyFlow() *tests.MsgProcessingSpecTest {
 		Name:        "blame/invalid scalar/happy flow",
 		TestingNode: testingNode,
 		InputMessages: []*dkg.SignedMessage{
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.InitMsgType,
 				Identifier: identifier,
 				Data:       initBytes,
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[2].EncryptionKey, 2, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_PreparationMessageBytes(2, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[3].SK, 3, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[3].EncryptionKey, 3, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_PreparationMessageBytes(3, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[4].SK, 4, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[4].EncryptionKey, 4, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_PreparationMessageBytes(4, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[2].EncryptionKey, 2, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       makeInvalidForInvalidScalar(frost.Testing_Round1MessageBytes(2, testingutils.KeygenMsgStore)),
 			}),
 		},
 		OutputMessages: []*dkg.SignedMessage{
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_PreparationMessageBytes(1, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data:       frost.Testing_Round1MessageBytes(1, testingutils.KeygenMsgStore),
 			}),
-			testingutils.SignDKGMsg(ks.DKGOperators[1].SK, 1, &dkg.Message{
+			testingutils.SignDKGMsg(ks.DKGOperators[1].EncryptionKey, 1, &dkg.Message{
 				MsgType:    dkg.ProtocolMsgType,
 				Identifier: identifier,
 				Data: frost.BlameMessageBytes(2, frost.InvalidMessage, []*dkg.SignedMessage{
-					testingutils.SignDKGMsg(ks.DKGOperators[2].SK, 2, &dkg.Message{
+					testingutils.SignDKGMsg(ks.DKGOperators[2].EncryptionKey, 2, &dkg.Message{
 						MsgType:    dkg.ProtocolMsgType,
 						Identifier: identifier,
 						Data:       makeInvalidForInvalidScalar(frost.Testing_Round1MessageBytes(2, testingutils.KeygenMsgStore)),

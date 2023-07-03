@@ -57,7 +57,8 @@ type SSVSigner interface {
 type DKGSigner interface {
 	SSVSigner
 	// SignDKGOutput signs output according to the SIP https://docs.google.com/document/d/1TRVUHjFyxINWW2H9FYLNL2pQoLy6gmvaI62KL_4cREQ/edit
-	SignDKGOutput(output Root, address common.Address) (Signature, error)
+	// SignDKGOutput(output Root, address common.Address) (Signature, error)
+	SignDKGOutput(output Root, privateKey *rsa.PrivateKey) ([]byte, error)
 	// SignETHDepositRoot signs an ethereum deposit root
 	SignETHDepositRoot(root []byte, address common.Address) (Signature, error)
 }

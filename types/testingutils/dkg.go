@@ -1,7 +1,6 @@
 package testingutils
 
 import (
-	"crypto/ecdsa"
 	"crypto/rsa"
 	"encoding/hex"
 	"fmt"
@@ -11,7 +10,6 @@ import (
 	"github.com/bloxapp/ssv-spec/dkg"
 	"github.com/bloxapp/ssv-spec/dkg/stubdkg"
 	"github.com/bloxapp/ssv-spec/types"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/herumi/bls-eth-go-binary/bls"
 )
 
@@ -39,18 +37,19 @@ var TestingDKGNode = func(keySet *TestKeySet) *dkg.Node {
 	}
 
 	return dkg.NewNode(&dkg.Operator{
-		OperatorID:       1,
-		ETHAddress:       keySet.DKGOperators[1].ETHAddress,
-		EncryptionPubKey: &keySet.DKGOperators[1].EncryptionKey.PublicKey,
+		OperatorID:           1,
+		ETHAddress:           keySet.DKGOperators[1].ETHAddress,
+		EncryptionPubKey:     &keySet.DKGOperators[1].EncryptionKey.PublicKey,
+		EncryptionPrivateKey: keySet.DKGOperators[1].EncryptionKey,
 	}, config)
 }
 
-var SignDKGMsg = func(sk *ecdsa.PrivateKey, id types.OperatorID, msg *dkg.Message) *dkg.SignedMessage {
+var SignDKGMsg = func(sk *rsa.PrivateKey, id types.OperatorID, msg *dkg.Message) *dkg.SignedMessage {
 	domain := types.PrimusTestnet
 	sigType := types.DKGSignatureType
 
 	r, _ := types.ComputeSigningRoot(msg, types.ComputeSignatureDomain(domain, sigType))
-	sig, _ := crypto.Sign(r, sk)
+	sig, _ := types.Sign(sk, r)
 
 	return &dkg.SignedMessage{
 		Message:   msg,
@@ -155,7 +154,8 @@ func (ks *TestKeySet) KeyGenOutput(opId types.OperatorID) *dkg.KeyGenOutput {
 }
 
 var (
-	signedOutputCache = map[string]*dkg.SignedOutput{}
+	signedOutputCache  = map[string]*dkg.SignedOutput{}
+	keySignOutputCache = map[string]*dkg.SignedOutput{}
 )
 
 func (ks *TestKeySet) SignedOutputObject(requestID dkg.RequestID, opId types.OperatorID, root []byte) *dkg.SignedOutput {
@@ -176,7 +176,8 @@ func (ks *TestKeySet) SignedOutputObject(requestID dkg.RequestID, opId types.Ope
 	// root1, _ := o.GetRoot()
 	root1, _ := types.ComputeSigningRoot(o, types.ComputeSignatureDomain(types.PrimusTestnet, types.DKGSignatureType))
 
-	sig, _ := crypto.Sign(root1, ks.DKGOperators[opId].SK)
+	sig, _ := types.Sign(ks.DKGOperators[opId].EncryptionKey, root1)
+	// sig, _ := crypto.Sign(root1, ks.DKGOperators[opId].SK)
 
 	ret := &dkg.SignedOutput{
 		Data:      o,
@@ -195,7 +196,7 @@ func (ks *TestKeySet) SignedOutputBytes(requestID dkg.RequestID, opId types.Oper
 
 func (ks *TestKeySet) SignedKeySignOutputObject(requestID dkg.RequestID, opID types.OperatorID, signingRoot []byte) *dkg.SignedOutput {
 	id := hex.EncodeToString(requestID[:]) + strconv.FormatUint(uint64(opID), 10) + hex.EncodeToString(signingRoot)
-	if found := signedOutputCache[id]; found != nil {
+	if found := keySignOutputCache[id]; found != nil {
 		return found
 	}
 
@@ -207,14 +208,14 @@ func (ks *TestKeySet) SignedKeySignOutputObject(requestID dkg.RequestID, opID ty
 	}
 
 	root, _ := types.ComputeSigningRoot(o, types.ComputeSignatureDomain(types.PrimusTestnet, types.DKGSignatureType))
-	sig, _ := crypto.Sign(root, ks.DKGOperators[opID].SK)
+	sig, _ := types.Sign(ks.DKGOperators[opID].EncryptionKey, root)
 
 	ret := &dkg.SignedOutput{
 		KeySignData: o,
 		Signer:      opID,
 		Signature:   sig,
 	}
-	signedOutputCache[id] = ret
+	keySignOutputCache[id] = ret
 	return ret
 }
 

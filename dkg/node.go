@@ -158,14 +158,6 @@ func (n *Node) ProcessMessage(msg *types.SSVMessage) error {
 	}
 }
 
-func (n *Node) validateSignedMessage(message *SignedMessage) error {
-	if err := message.Validate(); err != nil {
-		return errors.Wrap(err, "message invalid")
-	}
-
-	return nil
-}
-
 func (n *Node) startNewDKGMsg(message *SignedMessage) error {
 	initMsg, err := n.validateInitMsg(message)
 	if err != nil {
@@ -218,11 +210,6 @@ func (n *Node) startKeySign(message *SignedMessage) error {
 }
 
 func (n *Node) validateInitMsg(message *SignedMessage) (*Init, error) {
-	// validate identifier.GetEthAddress is the signer for message
-	if err := message.Signature.ECRecover(message, n.config.SignatureDomainType, types.DKGSignatureType, message.Message.Identifier.GetETHAddress()); err != nil {
-		return nil, errors.Wrap(err, "signed message invalid")
-	}
-
 	initMsg := &Init{}
 	if err := initMsg.Decode(message.Message.Data); err != nil {
 		return nil, errors.Wrap(err, "could not get dkg init Message from signed Messages")
@@ -236,16 +223,10 @@ func (n *Node) validateInitMsg(message *SignedMessage) (*Init, error) {
 	if n.runners.RunnerForID(message.Message.Identifier) != nil {
 		return nil, errors.New("dkg started already")
 	}
-
 	return initMsg, nil
 }
 
 func (n *Node) validateReshareMsg(message *SignedMessage) (*Reshare, error) {
-	// validate identifier.GetEthAddress is the signer for message
-	if err := message.Signature.ECRecover(message, n.config.SignatureDomainType, types.DKGSignatureType, message.Message.Identifier.GetETHAddress()); err != nil {
-		return nil, errors.Wrap(err, "signed message invalid")
-	}
-
 	reshareMsg := &Reshare{}
 	if err := reshareMsg.Decode(message.Message.Data); err != nil {
 		return nil, errors.Wrap(err, "could not get reshare Message from signed Messages")
@@ -259,16 +240,10 @@ func (n *Node) validateReshareMsg(message *SignedMessage) (*Reshare, error) {
 	if n.runners.RunnerForID(message.Message.Identifier) != nil {
 		return nil, errors.New("dkg started already")
 	}
-
 	return reshareMsg, nil
 }
 
 func (n *Node) validateKeySignMsg(message *SignedMessage) (*KeySign, error) {
-	// validate identifier.GetEthAddress is the signer for message
-	if err := message.Signature.ECRecover(message, n.config.SignatureDomainType, types.DKGSignatureType, message.Message.Identifier.GetETHAddress()); err != nil {
-		return nil, errors.Wrap(err, "signed message invalid")
-	}
-
 	keySign := &KeySign{}
 	if err := keySign.Decode(message.Message.Data); err != nil {
 		return nil, errors.Wrap(err, "could not get validator exit msg params from signed message")
@@ -282,46 +257,47 @@ func (n *Node) validateKeySignMsg(message *SignedMessage) (*KeySign, error) {
 	if n.runners.RunnerForID(message.Message.Identifier) != nil {
 		return nil, errors.New("signature protocol started already")
 	}
-
 	return keySign, nil
 }
 
 func (n *Node) processDKGMsg(message *SignedMessage) error {
+
 	if !n.runners.Exists(message.Message.Identifier) {
 		return errors.New("could not find dkg runner")
 	}
-
-	if err := n.validateDKGMsg(message); err != nil {
-		return errors.Wrap(err, "dkg msg not valid")
-	}
-
 	r := n.runners.RunnerForID(message.Message.Identifier)
+
 	finished, err := r.ProcessMsg(message)
 	if err != nil {
 		return errors.Wrap(err, "could not process dkg message")
 	}
+
 	if finished {
 		n.runners.DeleteRunner(message.Message.Identifier)
 	}
-
 	return nil
 }
 
-func (n *Node) validateDKGMsg(message *SignedMessage) error {
-
-	// find signing operator and verify sig
-	found, signingOperator, err := n.config.Storage.GetDKGOperator(message.Signer)
+func (n *Node) validateSignedMessage(message *SignedMessage) error {
+	found, operator, err := n.config.Storage.GetDKGOperator(message.Signer)
 	if err != nil {
-		return errors.Wrap(err, "can't fetch operator")
+		return fmt.Errorf("failed to retrieve operator info for signer %d: %w", message.Signer, err)
 	}
 	if !found {
-		return errors.New("can't find operator")
+		return fmt.Errorf("operator %d not found", message.Signer)
 	}
-	if err := message.Signature.ECRecover(message, n.config.SignatureDomainType, types.DKGSignatureType, signingOperator.ETHAddress); err != nil {
+
+	root, _ := types.ComputeSigningRoot(&SignedMessage{
+		Message: message.Message,
+		Signer:  message.Signer,
+	}, types.ComputeSignatureDomain(n.config.SignatureDomainType, types.DKGSignatureType))
+
+	isValid := types.Verify(operator.EncryptionPubKey, root, message.Signature)
+	if !isValid {
 		return errors.Wrap(err, "signed message invalid")
 	}
 
-	return nil
+	return message.Message.Validate()
 }
 
 func (n *Node) GetConfig() *Config {
