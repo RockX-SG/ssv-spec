@@ -18,3 +18,13 @@ func (n *Operator) GetPublicKey() []byte {
 func (n *Operator) GetID() OperatorID {
 	return n.OperatorID
 }
+
+type OperatorList []OperatorID
+
+func (l OperatorList) ToUint32List() []uint32 {
+	var res []uint32
+	for _, id := range l {
+		res = append(res, uint32(id))
+	}
+	return res
+}

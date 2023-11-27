@@ -292,7 +292,7 @@ func (n *Node) validateSignedMessage(message *SignedMessage) error {
 		Signer:  message.Signer,
 	}, types.ComputeSignatureDomain(n.config.SignatureDomainType, types.DKGSignatureType))
 
-	isValid := types.Verify(operator.EncryptionPubKey, root, message.Signature)
+	isValid := types.Verify(operator.EncryptionPubKey, root[:], message.Signature)
 	if !isValid {
 		return errors.Wrap(err, "signed message invalid")
 	}

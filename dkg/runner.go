@@ -2,6 +2,8 @@ package dkg
 
 import (
 	"bytes"
+	"crypto/rand"
+	"crypto/rsa"
 	"fmt"
 
 	"github.com/bloxapp/ssv-spec/types"
@@ -232,7 +234,7 @@ func (r *runner) validateSignedOutput(msg *SignedOutput) error {
 		return errors.Wrap(err, "fail to get root")
 	}
 
-	isValid := types.Verify(operator.EncryptionPubKey, root, msg.Signature)
+	isValid := types.Verify(operator.EncryptionPubKey, root[:], msg.Signature)
 	if !isValid {
 		return errors.New("invalid signature")
 	}
@@ -310,7 +312,7 @@ func (r *runner) prepareAndBroadcastKeyGenOutput() error {
 	// TODO: this is encryped in such manner so that cli can generate a compatible
 	// keyshares file
 	// https://docs.ssv.network/developers/tools/ssv-key-distributor/ssv-keys-cli
-	encryptedShare, err := r.config.Signer.Encrypt(r.Operator.EncryptionPubKey, []byte("0x"+r.KeygenOutcome.ProtocolOutput.Share.SerializeToHexStr()))
+	encryptedShare, err := rsa.EncryptPKCS1v15(rand.Reader, r.Operator.EncryptionPubKey, []byte("0x"+r.KeygenOutcome.ProtocolOutput.Share.SerializeToHexStr()))
 	if err != nil {
 		return errors.Wrap(err, "could not encrypt share")
 	}

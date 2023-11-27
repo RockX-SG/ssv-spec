@@ -8,7 +8,6 @@ import (
 
 	"github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/bloxapp/ssv-spec/types"
-	"github.com/ethereum/go-ethereum/accounts/abi"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/herumi/bls-eth-go-binary/bls"
@@ -85,13 +84,12 @@ func (msg *Message) Validate() error {
 	return nil
 }
 
-func (msg *Message) GetRoot() ([]byte, error) {
+func (msg *Message) GetRoot() ([32]byte, error) {
 	marshaledRoot, err := msg.Encode()
 	if err != nil {
-		return nil, errors.Wrap(err, "could not encode PartialSignatureMessage")
+		return [32]byte{}, errors.Wrap(err, "could not encode Message")
 	}
-	ret := sha256.Sum256(marshaledRoot)
-	return ret[:], nil
+	return sha256.Sum256(marshaledRoot), nil
 }
 
 type SignedMessage struct {
@@ -116,7 +114,7 @@ func (signedMsg *SignedMessage) Validate() error {
 	return signedMsg.Message.Validate()
 }
 
-func (signedMsg *SignedMessage) GetRoot() ([]byte, error) {
+func (signedMsg *SignedMessage) GetRoot() ([32]byte, error) {
 	return signedMsg.Message.GetRoot()
 }
 
@@ -245,34 +243,20 @@ type Output struct {
 	DepositDataSignature types.Signature
 }
 
-func (o *Output) GetRoot() ([]byte, error) {
-	bytesSolidity, _ := abi.NewType("bytes", "", nil)
+func (o *Output) Encode() ([]byte, error) {
+	return json.Marshal(o)
+}
 
-	arguments := abi.Arguments{
-		{
-			Type: bytesSolidity,
-		},
-		{
-			Type: bytesSolidity,
-		},
-		{
-			Type: bytesSolidity,
-		},
-		{
-			Type: bytesSolidity,
-		},
-	}
+func (o *Output) Decode(data []byte) error {
+	return json.Unmarshal(data, o)
+}
 
-	bytes, err := arguments.Pack(
-		[]byte(o.EncryptedShare),
-		[]byte(o.SharePubKey),
-		[]byte(o.ValidatorPubKey),
-		[]byte(o.DepositDataSignature),
-	)
+func (o *Output) GetRoot() ([32]byte, error) {
+	marshaledRoot, err := o.Encode()
 	if err != nil {
-		return nil, err
+		return [32]byte{}, errors.Wrap(err, "could not encode Message")
 	}
-	return crypto.Keccak256(bytes), nil
+	return sha256.Sum256(marshaledRoot), nil
 }
 
 type SignedOutput struct {
@@ -314,27 +298,12 @@ func (msg *BlameData) Decode(data []byte) error {
 	return json.Unmarshal(data, msg)
 }
 
-func (msg *BlameData) GetRoot() ([]byte, error) {
-	bytesSolidity, _ := abi.NewType("bytes", "", nil)
-	boolSolidity, _ := abi.NewType("bool", "", nil)
-
-	arguments := abi.Arguments{
-		{
-			Type: boolSolidity,
-		},
-		{
-			Type: bytesSolidity,
-		},
-	}
-
-	bytes, err := arguments.Pack(
-		msg.Valid,
-		[]byte(msg.BlameMessage),
-	)
+func (msg *BlameData) GetRoot() ([32]byte, error) {
+	marshaledRoot, err := msg.Encode()
 	if err != nil {
-		return nil, err
+		return [32]byte{}, errors.Wrap(err, "could not encode Message")
 	}
-	return crypto.Keccak256(bytes), nil
+	return sha256.Sum256(marshaledRoot), nil
 }
 
 func SignOutput(output *Output, privKey *ecdsa.PrivateKey) (types.Signature, error) {
@@ -343,7 +312,7 @@ func SignOutput(output *Output, privKey *ecdsa.PrivateKey) (types.Signature, err
 		return nil, errors.Wrap(err, "could not get root from output message")
 	}
 
-	return crypto.Sign(root, privKey)
+	return crypto.Sign(root[:], privKey)
 }
 
 // PartialDepositData contains a partial deposit data signature

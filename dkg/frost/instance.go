@@ -209,7 +209,7 @@ func (fr *Instance) validateSignedMessage(msg *dkg.SignedMessage) error {
 		return errors.Wrap(err, "failed to get root")
 	}
 
-	if !types.Verify(operator.EncryptionPubKey, root, msg.Signature) {
+	if !types.Verify(operator.EncryptionPubKey, root[:], msg.Signature) {
 		return errors.New("invalid signature")
 	}
 	return nil
