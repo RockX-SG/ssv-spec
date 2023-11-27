@@ -1,14 +1,15 @@
 package preconsensus
 
 import (
-	"github.com/bloxapp/ssv-spec/ssv"
+	"github.com/attestantio/go-eth2-client/spec"
+
 	"github.com/bloxapp/ssv-spec/ssv/spectest/tests"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
 )
 
 // DuplicateMsgDifferentRoots tests duplicate SignedPartialSignatureMessage (from same signer) but with different roots
-func DuplicateMsgDifferentRoots() *tests.MultiMsgProcessingSpecTest {
+func DuplicateMsgDifferentRoots() tests.SpecTest {
 	ks := testingutils.Testing4SharesSet()
 	return &tests.MultiMsgProcessingSpecTest{
 		Name: "pre consensus msg different roots",
@@ -16,13 +17,13 @@ func DuplicateMsgDifferentRoots() *tests.MultiMsgProcessingSpecTest {
 			{
 				Name:   "sync committee aggregator selection proof",
 				Runner: testingutils.SyncCommitteeContributionRunner(ks),
-				Duty:   testingutils.TestingSyncCommitteeContributionDuty,
+				Duty:   &testingutils.TestingSyncCommitteeContributionDuty,
 				Messages: []*types.SSVMessage{
 					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PreConsensusContributionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1)),
 					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PreConsensusCustomSlotContributionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1, testingutils.TestingDutySlot+1)),
 				},
-				PostDutyRunnerStateRoot: "85036a9bf2d0b8ecaec3c539cc977efbfcaadde3a232c35c5ab4c1db45c7923d",
-				OutputMessages: []*ssv.SignedPartialSignatureMessage{
+				PostDutyRunnerStateRoot: "8d9edd36c3634e54d76985ddb4fa80f3427b47ab7dfab6053e7a396ab5ee494f",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
 					testingutils.PreConsensusContributionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1), // broadcasts when starting a new duty
 				},
 				ExpectedError: "failed processing sync committee selection proof message: invalid pre-consensus message: wrong signing root",
@@ -30,13 +31,13 @@ func DuplicateMsgDifferentRoots() *tests.MultiMsgProcessingSpecTest {
 			{
 				Name:   "aggregator selection proof",
 				Runner: testingutils.AggregatorRunner(ks),
-				Duty:   testingutils.TestingAggregatorDuty,
+				Duty:   &testingutils.TestingAggregatorDuty,
 				Messages: []*types.SSVMessage{
 					testingutils.SSVMsgAggregator(nil, testingutils.PreConsensusSelectionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1)),
 					testingutils.SSVMsgAggregator(nil, testingutils.PreConsensusCustomSlotSelectionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1, testingutils.TestingDutySlot+1)),
 				},
-				PostDutyRunnerStateRoot: "7e90fccb1d93995a0079f522c4c8faab85fd0b260ab6051b90fa8befb8b0c98a",
-				OutputMessages: []*ssv.SignedPartialSignatureMessage{
+				PostDutyRunnerStateRoot: "c5d864ca6a4ede7fe637846d080e0fe2cf1f4597c463cbf9a675bfbb78eacfc5",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
 					testingutils.PreConsensusSelectionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1), // broadcasts when starting a new duty
 				},
 				ExpectedError: "failed processing selection proof message: invalid pre-consensus message: wrong signing root",
@@ -44,16 +45,58 @@ func DuplicateMsgDifferentRoots() *tests.MultiMsgProcessingSpecTest {
 			{
 				Name:   "randao",
 				Runner: testingutils.ProposerRunner(ks),
-				Duty:   testingutils.TestingProposerDuty,
+				Duty:   testingutils.TestingProposerDutyV(spec.DataVersionBellatrix),
 				Messages: []*types.SSVMessage{
-					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsg(ks.Shares[1], ks.Shares[1], 1, 1)),
-					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoNextEpochMsg(ks.Shares[1], 1)),
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[1], ks.Shares[1], 1, 1, spec.DataVersionBellatrix)),
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoNextEpochMsgV(ks.Shares[1], 1, spec.DataVersionBellatrix)),
 				},
-				PostDutyRunnerStateRoot: "717e53a8cdb20f1d676bef0238637e42687c594758586f28d166697660ceb72d",
-				OutputMessages: []*ssv.SignedPartialSignatureMessage{
-					testingutils.PreConsensusRandaoMsg(ks.Shares[1], 1), // broadcasts when starting a new duty
+				PostDutyRunnerStateRoot: "25e3df0f843734a2c4d00a5579c262d96ff2b0681c48b6800fb5dfbd22b91123",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
+					testingutils.PreConsensusRandaoMsgV(ks.Shares[1], 1, spec.DataVersionBellatrix), // broadcasts when starting a new duty
 				},
 				ExpectedError: "failed processing randao message: invalid pre-consensus message: wrong signing root",
+			},
+			{
+				Name:   "randao (blinded block)",
+				Runner: testingutils.ProposerBlindedBlockRunner(ks),
+				Duty:   testingutils.TestingProposerDutyV(spec.DataVersionBellatrix),
+				Messages: []*types.SSVMessage{
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[1], ks.Shares[1], 1, 1, spec.DataVersionBellatrix)),
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoNextEpochMsgV(ks.Shares[1], 1, spec.DataVersionBellatrix)),
+				},
+				PostDutyRunnerStateRoot: "66967c4a461039e82dd60ca2ccd13ba82691bb43d5835a2b45394bfb4c0bc0ef",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
+					testingutils.PreConsensusRandaoMsgV(ks.Shares[1], 1, spec.DataVersionBellatrix), // broadcasts when starting a new duty
+				},
+				ExpectedError: "failed processing randao message: invalid pre-consensus message: wrong signing root",
+			},
+			{
+				Name:   "validator registration",
+				Runner: testingutils.ValidatorRegistrationRunner(ks),
+				Duty:   &testingutils.TestingValidatorRegistrationDuty,
+				Messages: []*types.SSVMessage{
+					testingutils.SSVMsgValidatorRegistration(nil, testingutils.PreConsensusValidatorRegistrationMsg(ks.Shares[1], 1)),
+					testingutils.SSVMsgValidatorRegistration(nil, testingutils.PreConsensusValidatorRegistrationWrongRootMsg(ks.Shares[1], 1)),
+				},
+				PostDutyRunnerStateRoot: "6f6d918e15ebc7b84cb77e2d603019d1cbfb6d7293daddd48780da47c14e53ce",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
+					testingutils.PreConsensusValidatorRegistrationMsg(ks.Shares[1], 1), // broadcasts when starting a new duty
+				},
+				ExpectedError: "failed processing validator registration message: invalid pre-consensus message: wrong signing root",
+			},
+			{
+				Name:   "voluntary exit",
+				Runner: testingutils.VoluntaryExitRunner(ks),
+				Duty:   &testingutils.TestingVoluntaryExitDuty,
+				Messages: []*types.SSVMessage{
+					testingutils.SSVMsgVoluntaryExit(nil, testingutils.PreConsensusVoluntaryExitMsg(ks.Shares[1], 1)),
+					testingutils.SSVMsgVoluntaryExit(nil, testingutils.PreConsensusVoluntaryExitWrongRootMsg(ks.Shares[1], 1)),
+				},
+				PostDutyRunnerStateRoot: "6f6d918e15ebc7b84cb77e2d603019d1cbfb6d7293daddd48780da47c14e53ce",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
+					testingutils.PreConsensusVoluntaryExitMsg(ks.Shares[1], 1), // broadcasts when starting a new duty
+				},
+				ExpectedError: "failed processing voluntary exit message: invalid pre-consensus message: wrong signing root",
 			},
 		},
 	}

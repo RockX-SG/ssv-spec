@@ -8,70 +8,32 @@ import (
 )
 
 // QuorumOrder2 tests LIVENESS where the rc quorum msgs in different order
-func QuorumOrder2() *tests.MsgProcessingSpecTest {
+func QuorumOrder2() tests.SpecTest {
+	ks := testingutils.Testing4SharesSet()
 	pre := testingutils.BaseInstance()
 	pre.State.Round = 2
 
 	prepareMsgs := []*qbft.SignedMessage{
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.PrepareMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.PrepareDataBytes([]byte{1, 2, 3, 4}),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[3], types.OperatorID(3), &qbft.Message{
-			MsgType:    qbft.PrepareMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.PrepareDataBytes([]byte{1, 2, 3, 4}),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[2], types.OperatorID(2), &qbft.Message{
-			MsgType:    qbft.PrepareMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.PrepareDataBytes([]byte{1, 2, 3, 4}),
-		}),
+		testingutils.TestingPrepareMessage(ks.Shares[1], types.OperatorID(1)),
+		testingutils.TestingPrepareMessage(ks.Shares[3], types.OperatorID(3)),
+		testingutils.TestingPrepareMessage(ks.Shares[2], types.OperatorID(2)),
 	}
 	msgs := []*qbft.SignedMessage{
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[2], types.OperatorID(2), &qbft.Message{
-			MsgType:    qbft.RoundChangeMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      2,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.RoundChangeDataBytes(nil, qbft.NoRound),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.RoundChangeMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      2,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.RoundChangePreparedDataBytes([]byte{1, 2, 3, 4}, qbft.FirstRound, prepareMsgs),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[3], types.OperatorID(3), &qbft.Message{
-			MsgType:    qbft.RoundChangeMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      2,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.RoundChangeDataBytes(nil, qbft.NoRound),
-		}),
+		testingutils.TestingRoundChangeMessageWithRound(ks.Shares[2], types.OperatorID(2), 2),
+		testingutils.TestingRoundChangeMessageWithRoundAndRC(ks.Shares[1], types.OperatorID(1), 2,
+			testingutils.MarshalJustifications(prepareMsgs)),
+		testingutils.TestingRoundChangeMessageWithRound(ks.Shares[3], types.OperatorID(3), 2),
 	}
 
 	return &tests.MsgProcessingSpecTest{
 		Name:          "round change quorum order 2",
 		Pre:           pre,
-		PostRoot:      "85fb43d364c7dba0123903aed497a03d4460e8cb9346624b5f2dcd9f75aff124",
+		PostRoot:      "a7aed8500c01312f41067319c037b4c8d180bbe733a6da1464390394dcd9cc02",
 		InputMessages: msgs,
 		OutputMessages: []*qbft.SignedMessage{
-			testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-				MsgType:    qbft.ProposalMsgType,
-				Height:     qbft.FirstHeight,
-				Round:      2,
-				Identifier: []byte{1, 2, 3, 4},
-				Data:       testingutils.ProposalDataBytes([]byte{1, 2, 3, 4}, msgs, prepareMsgs),
-			}),
+			testingutils.TestingProposalMessageWithParams(
+				ks.Shares[1], types.OperatorID(1), 2, qbft.FirstHeight, testingutils.TestingQBFTRootData,
+				testingutils.MarshalJustifications(msgs), testingutils.MarshalJustifications(prepareMsgs)),
 		},
 	}
 }

@@ -11,13 +11,14 @@ import (
 
 	"github.com/bloxapp/ssv-spec/qbft"
 	tests2 "github.com/bloxapp/ssv-spec/qbft/spectest/tests"
-	"github.com/bloxapp/ssv-spec/qbft/spectest/tests/controller/futuremsg"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
 	"github.com/stretchr/testify/require"
 )
 
 func TestAll(t *testing.T) {
-	for _, test := range AllTests {
+	t.Parallel()
+	for _, testF := range AllTests {
+		test := testF()
 		t.Run(test.TestName(), func(t *testing.T) {
 			test.Run(t)
 		})
@@ -26,10 +27,9 @@ func TestAll(t *testing.T) {
 
 func TestJson(t *testing.T) {
 	basedir, _ := os.Getwd()
-	path := filepath.Join(basedir, "generate")
-	fileName := "tests.json"
+	path := filepath.Join(basedir, "generate", "tests.json")
 	untypedTests := map[string]interface{}{}
-	byteValue, err := os.ReadFile(path + "/" + fileName)
+	byteValue, err := os.ReadFile(path)
 	if err != nil {
 		panic(err.Error())
 	}
@@ -38,7 +38,7 @@ func TestJson(t *testing.T) {
 		panic(err.Error())
 	}
 
-	tests := make(map[string]SpecTest)
+	tests := make(map[string]tests2.SpecTest)
 	for name, test := range untypedTests {
 		testName := test.(map[string]interface{})["Name"].(string)
 		t.Run(testName, func(t *testing.T) {
@@ -96,14 +96,6 @@ func TestJson(t *testing.T) {
 
 				tests[testName] = typedTest
 				typedTest.Run(t)
-			case reflect.TypeOf(&futuremsg.ControllerSyncSpecTest{}).String():
-				byts, err := json.Marshal(test)
-				require.NoError(t, err)
-				typedTest := &futuremsg.ControllerSyncSpecTest{}
-				require.NoError(t, json.Unmarshal(byts, &typedTest))
-
-				tests[testName] = typedTest
-				typedTest.Run(t)
 			case reflect.TypeOf(&timeout.SpecTest{}).String():
 				byts, err := json.Marshal(test)
 				require.NoError(t, err)
@@ -121,7 +113,7 @@ func TestJson(t *testing.T) {
 				err = pre.Decode(preByts)
 				require.NoError(t, err)
 				typedTest.Pre = pre
-				
+
 				tests[testName] = typedTest
 				typedTest.Run(t)
 			default:

@@ -1,39 +1,66 @@
 package processmsg
 
 import (
+	"github.com/herumi/bls-eth-go-binary/bls"
+
 	"github.com/bloxapp/ssv-spec/qbft"
 	"github.com/bloxapp/ssv-spec/qbft/spectest/tests"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
-	"github.com/herumi/bls-eth-go-binary/bls"
+	qbftcomparable "github.com/bloxapp/ssv-spec/types/testingutils/comparable"
 )
 
 // FullDecided tests process msg and first time deciding
-func FullDecided() *tests.ControllerSpecTest {
-	identifier := types.NewMsgID(testingutils.TestingValidatorPubKey[:], types.BNRoleAttester)
+func FullDecided() tests.SpecTest {
 	ks := testingutils.Testing4SharesSet()
+	sc := fullDecidedStateComparison()
 	return &tests.ControllerSpecTest{
 		Name: "full decided",
 		RunInstanceData: []*tests.RunInstanceData{
 			{
-				InputValue:    []byte{1, 2, 3, 4},
-				InputMessages: testingutils.DecidingMsgsForHeight([]byte{1, 2, 3, 4}, identifier[:], qbft.FirstHeight, ks),
+				InputValue: testingutils.TestingQBFTFullData,
+				InputMessages: testingutils.DecidingMsgsForHeightWithRoot(testingutils.TestingQBFTRootData,
+					testingutils.TestingQBFTFullData, testingutils.TestingIdentifier, qbft.FirstHeight, ks),
 				ExpectedDecidedState: tests.DecidedState{
-					DecidedVal: []byte{1, 2, 3, 4},
+					DecidedVal: testingutils.TestingQBFTFullData,
 					DecidedCnt: 1,
-					BroadcastedDecided: testingutils.MultiSignQBFTMsg(
+					BroadcastedDecided: testingutils.TestingCommitMultiSignerMessage(
 						[]*bls.SecretKey{ks.Shares[1], ks.Shares[2], ks.Shares[3]},
 						[]types.OperatorID{1, 2, 3},
-						&qbft.Message{
-							MsgType:    qbft.CommitMsgType,
-							Height:     qbft.FirstHeight,
-							Round:      qbft.FirstRound,
-							Identifier: identifier[:],
-							Data:       testingutils.CommitDataBytes([]byte{1, 2, 3, 4}),
-						}),
+					),
 				},
-				ControllerPostRoot: "0370be5066cbbf1efead61d9b182309afd989b3b720163f7029cbad79537eb4b",
+				ControllerPostRoot:  sc.Root(),
+				ControllerPostState: sc.ExpectedState,
 			},
 		},
 	}
+}
+
+func fullDecidedStateComparison() *qbftcomparable.StateComparison {
+	ks := testingutils.Testing4SharesSet()
+	msgs := testingutils.ExpectedDecidingMsgsForHeightWithRoot(testingutils.TestingQBFTRootData, testingutils.TestingQBFTFullData, testingutils.TestingIdentifier, qbft.FirstHeight, ks)
+
+	contr := testingutils.NewTestingQBFTController(
+		testingutils.TestingIdentifier,
+		testingutils.TestingShare(testingutils.Testing4SharesSet()),
+		testingutils.TestingConfig(testingutils.Testing4SharesSet()),
+	)
+
+	instance := &qbft.Instance{
+		StartValue: testingutils.TestingQBFTFullData,
+		State: &qbft.State{
+			Share:                           testingutils.TestingShare(testingutils.Testing4SharesSet()),
+			ID:                              testingutils.TestingIdentifier,
+			ProposalAcceptedForCurrentRound: testingutils.TestingProposalMessage(ks.Shares[1], types.OperatorID(1)),
+			LastPreparedRound:               qbft.FirstRound,
+			LastPreparedValue:               testingutils.TestingQBFTFullData,
+			Decided:                         true,
+			DecidedValue:                    testingutils.TestingQBFTFullData,
+			Round:                           qbft.FirstRound,
+		},
+	}
+	qbftcomparable.SetSignedMessages(instance, msgs)
+	contr.StoredInstances = append(contr.StoredInstances, instance)
+
+	return &qbftcomparable.StateComparison{ExpectedState: contr}
 }

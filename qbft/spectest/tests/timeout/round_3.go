@@ -2,34 +2,35 @@ package timeout
 
 import (
 	"github.com/bloxapp/ssv-spec/qbft"
+	"github.com/bloxapp/ssv-spec/qbft/spectest/tests"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
+	"github.com/bloxapp/ssv-spec/types/testingutils/comparable"
 )
 
 // Round3 tests calling UponRoundTimeout for round 3, testing state and broadcasted msgs
-func Round3() *SpecTest {
+func Round3() tests.SpecTest {
 	ks := testingutils.Testing4SharesSet()
+	sc := round3StateComparison()
+
 	pre := testingutils.BaseInstance()
 	pre.State.Round = 3
-	pre.State.ProposalAcceptedForCurrentRound = testingutils.SignQBFTMsg(ks.Shares[1], types.OperatorID(1), &qbft.Message{
-		MsgType:    qbft.ProposalMsgType,
-		Height:     qbft.FirstHeight,
-		Round:      3,
-		Identifier: []byte{1, 2, 3, 4},
-		Data:       testingutils.ProposalDataBytes([]byte{1, 2, 3, 4}, nil, nil),
-	})
+	pre.State.ProposalAcceptedForCurrentRound = testingutils.TestingProposalMessageWithRound(ks.Shares[1], types.OperatorID(1), 3)
 
 	return &SpecTest{
-		Name:     "round 3",
-		Pre:      pre,
-		PostRoot: "602888888c9a62dd219b2425b746065f8bcc0d088f99f9943639a46216567b63",
+		Name:      "round 3",
+		Pre:       pre,
+		PostRoot:  sc.Root(),
+		PostState: sc.ExpectedState,
 		OutputMessages: []*qbft.SignedMessage{
 			testingutils.SignQBFTMsg(ks.Shares[1], types.OperatorID(1), &qbft.Message{
-				MsgType:    qbft.RoundChangeMsgType,
-				Height:     qbft.FirstHeight,
-				Round:      4,
-				Identifier: []byte{1, 2, 3, 4},
-				Data:       testingutils.RoundChangeDataBytes(nil, qbft.NoRound),
+				MsgType:                  qbft.RoundChangeMsgType,
+				Height:                   qbft.FirstHeight,
+				Round:                    4,
+				Identifier:               testingutils.TestingIdentifier,
+				Root:                     [32]byte{},
+				RoundChangeJustification: [][]byte{},
+				PrepareJustification:     [][]byte{},
 			}),
 		},
 		ExpectedTimerState: &testingutils.TimerState{
@@ -37,4 +38,11 @@ func Round3() *SpecTest {
 			Round:    4,
 		},
 	}
+}
+
+func round3StateComparison() *comparable.StateComparison {
+	state := testingutils.BaseInstance().State
+	state.Round = 4
+
+	return &comparable.StateComparison{ExpectedState: state}
 }

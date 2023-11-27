@@ -1,133 +1,222 @@
 package consensus
 
 import (
+	"fmt"
+
+	"github.com/attestantio/go-eth2-client/spec"
+	"github.com/herumi/bls-eth-go-binary/bls"
+
 	"github.com/bloxapp/ssv-spec/qbft"
-	"github.com/bloxapp/ssv-spec/ssv"
 	"github.com/bloxapp/ssv-spec/ssv/spectest/tests"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
 )
 
 // PostFinish tests a valid commit msg after runner finished
-func PostFinish() *tests.MultiMsgProcessingSpecTest {
+func PostFinish() tests.SpecTest {
 	ks := testingutils.Testing4SharesSet()
 
-	// TODO: check error
-	// nolint
-	finishRunner := func(r ssv.Runner, duty *types.Duty) ssv.Runner {
-		r.GetBaseRunner().State = ssv.NewRunnerState(3, duty)
-		r.GetBaseRunner().State.RunningInstance = qbft.NewInstance(
-			r.GetBaseRunner().QBFTController.GetConfig(),
-			r.GetBaseRunner().Share,
-			r.GetBaseRunner().QBFTController.Identifier,
-			qbft.FirstHeight)
-		r.GetBaseRunner().State.RunningInstance.State.Decided = true
-		r.GetBaseRunner().QBFTController.StoredInstances = append(r.GetBaseRunner().QBFTController.StoredInstances, r.GetBaseRunner().State.RunningInstance)
-		r.GetBaseRunner().QBFTController.Height = qbft.FirstHeight
-		r.GetBaseRunner().State.Finished = true
-		return r
-	}
-
-	err := "failed processing consensus message: could not process msg: did not receive proposal for this round"
-
-	return &tests.MultiMsgProcessingSpecTest{
+	multiSpecTest := &tests.MultiMsgProcessingSpecTest{
 		Name: "consensus valid post finish",
 		Tests: []*tests.MsgProcessingSpecTest{
 			{
 				Name:   "sync committee contribution",
-				Runner: finishRunner(testingutils.SyncCommitteeContributionRunner(ks), testingutils.TestingSyncCommitteeContributionDuty),
-				Duty:   testingutils.TestingSyncCommitteeContributionDuty,
-				Messages: []*types.SSVMessage{
+				Runner: testingutils.SyncCommitteeContributionRunner(ks),
+				Duty:   &testingutils.TestingSyncCommitteeContributionDuty,
+				Messages: append(
+					testingutils.SSVDecidingMsgsV(testingutils.TestSyncCommitteeContributionConsensusData, ks, types.BNRoleSyncCommitteeContribution),
+					// post consensus
+					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PostConsensusSyncCommitteeContributionMsg(ks.Shares[1], 1, ks)),
+					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PostConsensusSyncCommitteeContributionMsg(ks.Shares[2], 2, ks)),
+					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PostConsensusSyncCommitteeContributionMsg(ks.Shares[3], 3, ks)),
+					// commit msg
 					testingutils.SSVMsgSyncCommitteeContribution(
-						testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[4], types.OperatorID(4), &qbft.Message{
-							MsgType:    qbft.CommitMsgType,
-							Height:     qbft.FirstHeight,
-							Round:      qbft.FirstRound,
-							Identifier: testingutils.SyncCommitteeContributionMsgID,
-							Data:       testingutils.CommitDataBytes(testingutils.TestSyncCommitteeContributionConsensusDataByts),
-						}), nil),
+						testingutils.TestingCommitMultiSignerMessageWithHeightIdentifierAndFullData(
+							[]*bls.SecretKey{ks.Shares[4]},
+							[]types.OperatorID{4},
+							qbft.Height(testingutils.TestingDutySlot),
+							testingutils.SyncCommitteeContributionMsgID,
+							testingutils.TestSyncCommitteeContributionConsensusDataByts,
+						), nil),
+				),
+				PostDutyRunnerStateRoot: postFinishSyncCommitteeContributionSC().Root(),
+				PostDutyRunnerState:     postFinishSyncCommitteeContributionSC().ExpectedState,
+				OutputMessages: []*types.SignedPartialSignatureMessage{
+					testingutils.PreConsensusContributionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1),
+					testingutils.PostConsensusSyncCommitteeContributionMsg(ks.Shares[1], 1, ks),
 				},
-				PostDutyRunnerStateRoot: "be94f68cceefd2f4dbc1b5245d4a0b85cfec3c3651c31f8974305a84fd524ab3",
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
-				DontStartDuty:           true,
-				ExpectedError:           err,
+				BeaconBroadcastedRoots: []string{
+					testingutils.GetSSZRootNoError(testingutils.TestingSignedSyncCommitteeContributions(testingutils.TestingSyncCommitteeContributions[0], testingutils.TestingContributionProofsSigned[0], ks)),
+					testingutils.GetSSZRootNoError(testingutils.TestingSignedSyncCommitteeContributions(testingutils.TestingSyncCommitteeContributions[1], testingutils.TestingContributionProofsSigned[1], ks)),
+					testingutils.GetSSZRootNoError(testingutils.TestingSignedSyncCommitteeContributions(testingutils.TestingSyncCommitteeContributions[2], testingutils.TestingContributionProofsSigned[2], ks)),
+				},
 			},
 			{
 				Name:   "sync committee",
-				Runner: finishRunner(testingutils.SyncCommitteeRunner(ks), testingutils.TestingSyncCommitteeDuty),
-				Duty:   testingutils.TestingSyncCommitteeDuty,
-				Messages: []*types.SSVMessage{
+				Runner: testingutils.SyncCommitteeRunner(ks),
+				Duty:   &testingutils.TestingSyncCommitteeDuty,
+				Messages: append(
+					testingutils.SSVDecidingMsgsV(testingutils.TestSyncCommitteeConsensusData, ks, types.BNRoleSyncCommittee),
+					// post consensus
+					testingutils.SSVMsgSyncCommittee(nil, testingutils.PostConsensusSyncCommitteeMsg(ks.Shares[1], 1)),
+					testingutils.SSVMsgSyncCommittee(nil, testingutils.PostConsensusSyncCommitteeMsg(ks.Shares[2], 2)),
+					testingutils.SSVMsgSyncCommittee(nil, testingutils.PostConsensusSyncCommitteeMsg(ks.Shares[3], 3)),
+					// commit msg
 					testingutils.SSVMsgSyncCommittee(
-						testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[4], types.OperatorID(4), &qbft.Message{
-							MsgType:    qbft.CommitMsgType,
-							Height:     qbft.FirstHeight,
-							Round:      qbft.FirstRound,
-							Identifier: testingutils.SyncCommitteeMsgID,
-							Data:       testingutils.CommitDataBytes(testingutils.TestSyncCommitteeConsensusDataByts),
-						}), nil),
+						testingutils.TestingCommitMultiSignerMessageWithHeightIdentifierAndFullData(
+							[]*bls.SecretKey{ks.Shares[4]},
+							[]types.OperatorID{4},
+							qbft.Height(testingutils.TestingDutySlot),
+							testingutils.SyncCommitteeMsgID,
+							testingutils.TestSyncCommitteeConsensusDataByts,
+						), nil),
+				),
+				PostDutyRunnerStateRoot: postFinishSyncCommitteeSC().Root(),
+				PostDutyRunnerState:     postFinishSyncCommitteeSC().ExpectedState,
+				OutputMessages: []*types.SignedPartialSignatureMessage{
+					testingutils.PostConsensusSyncCommitteeMsg(ks.Shares[1], 1),
 				},
-				PostDutyRunnerStateRoot: "85020e45bf7e48fb208580044a6c053cd3f155615fb53c2a146729e96fe090e4",
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
-				DontStartDuty:           true,
-				ExpectedError:           err,
+				BeaconBroadcastedRoots: []string{
+					testingutils.GetSSZRootNoError(testingutils.TestingSignedSyncCommitteeBlockRoot(ks)),
+				},
 			},
 			{
 				Name:   "aggregator",
-				Runner: finishRunner(testingutils.AggregatorRunner(ks), testingutils.TestingAggregatorDuty),
-				Duty:   testingutils.TestingAggregatorDuty,
-				Messages: []*types.SSVMessage{
+				Runner: testingutils.AggregatorRunner(ks),
+				Duty:   &testingutils.TestingAggregatorDuty,
+				Messages: append(
+					testingutils.SSVDecidingMsgsV(testingutils.TestAggregatorConsensusData, ks, types.BNRoleAggregator),
+					// post consensus
+					testingutils.SSVMsgAggregator(nil, testingutils.PostConsensusAggregatorMsg(ks.Shares[1], 1)),
+					testingutils.SSVMsgAggregator(nil, testingutils.PostConsensusAggregatorMsg(ks.Shares[2], 2)),
+					testingutils.SSVMsgAggregator(nil, testingutils.PostConsensusAggregatorMsg(ks.Shares[3], 3)),
+					// commit msg
 					testingutils.SSVMsgAggregator(
-						testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[4], types.OperatorID(4), &qbft.Message{
-							MsgType:    qbft.CommitMsgType,
-							Height:     qbft.FirstHeight,
-							Round:      qbft.FirstRound,
-							Identifier: testingutils.AggregatorMsgID,
-							Data:       testingutils.CommitDataBytes(testingutils.TestAggregatorConsensusDataByts),
-						}), nil),
+						testingutils.TestingCommitMultiSignerMessageWithHeightIdentifierAndFullData(
+							[]*bls.SecretKey{ks.Shares[4]},
+							[]types.OperatorID{4},
+							qbft.Height(testingutils.TestingDutySlot),
+							testingutils.AggregatorMsgID,
+							testingutils.TestAggregatorConsensusDataByts,
+						), nil),
+				),
+				PostDutyRunnerStateRoot: postFinishAggregatorSC().Root(),
+				PostDutyRunnerState:     postFinishAggregatorSC().ExpectedState,
+				OutputMessages: []*types.SignedPartialSignatureMessage{
+					testingutils.PreConsensusSelectionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1),
+					testingutils.PostConsensusAggregatorMsg(ks.Shares[1], 1),
 				},
-				PostDutyRunnerStateRoot: "b6c9779f0df680083bb5ac5e9e39565982554350c41345f6c714e93cf8815927",
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
-				DontStartDuty:           true,
-				ExpectedError:           err,
-			},
-			{
-				Name:   "proposer",
-				Runner: finishRunner(testingutils.ProposerRunner(ks), testingutils.TestingProposerDuty),
-				Duty:   testingutils.TestingProposerDuty,
-				Messages: []*types.SSVMessage{
-					testingutils.SSVMsgProposer(
-						testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[4], types.OperatorID(4), &qbft.Message{
-							MsgType:    qbft.CommitMsgType,
-							Height:     qbft.FirstHeight,
-							Round:      qbft.FirstRound,
-							Identifier: testingutils.ProposerMsgID,
-							Data:       testingutils.CommitDataBytes(testingutils.TestProposerConsensusDataByts),
-						}), nil),
+				BeaconBroadcastedRoots: []string{
+					testingutils.GetSSZRootNoError(testingutils.TestingSignedAggregateAndProof(ks)),
 				},
-				PostDutyRunnerStateRoot: "cace810b30635d5ed6e1a4b1484add992c7677566ce5d3e7b250a86a4f8afcbf",
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
-				DontStartDuty:           true,
-				ExpectedError:           err,
 			},
 			{
 				Name:   "attester",
-				Runner: finishRunner(testingutils.AttesterRunner(ks), testingutils.TestingAttesterDuty),
-				Duty:   testingutils.TestingAttesterDuty,
-				Messages: []*types.SSVMessage{
+				Runner: testingutils.AttesterRunner(ks),
+				Duty:   &testingutils.TestingAttesterDuty,
+				Messages: append(
+					testingutils.SSVDecidingMsgsV(testingutils.TestAttesterConsensusData, ks, types.BNRoleAttester),
+					// post consensus
+					testingutils.SSVMsgAttester(nil, testingutils.PostConsensusAttestationMsg(ks.Shares[1], 1, testingutils.TestingDutySlot)),
+					testingutils.SSVMsgAttester(nil, testingutils.PostConsensusAttestationMsg(ks.Shares[2], 2, testingutils.TestingDutySlot)),
+					testingutils.SSVMsgAttester(nil, testingutils.PostConsensusAttestationMsg(ks.Shares[3], 3, testingutils.TestingDutySlot)),
+					// commit msg
 					testingutils.SSVMsgAttester(
-						testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[4], types.OperatorID(4), &qbft.Message{
-							MsgType:    qbft.CommitMsgType,
-							Height:     qbft.FirstHeight,
-							Round:      qbft.FirstRound,
-							Identifier: testingutils.AttesterMsgID,
-							Data:       testingutils.CommitDataBytes(testingutils.TestAttesterConsensusDataByts),
-						}), nil),
+						testingutils.TestingCommitMultiSignerMessageWithHeightIdentifierAndFullData(
+							[]*bls.SecretKey{ks.Shares[4]},
+							[]types.OperatorID{4},
+							qbft.Height(testingutils.TestingDutySlot),
+							testingutils.AttesterMsgID,
+							testingutils.TestAttesterConsensusDataByts,
+						), nil),
+				),
+				PostDutyRunnerStateRoot: postFinishAttesterSC().Root(),
+				PostDutyRunnerState:     postFinishAttesterSC().ExpectedState,
+				OutputMessages: []*types.SignedPartialSignatureMessage{
+					testingutils.PostConsensusAttestationMsg(ks.Shares[1], 1, testingutils.TestingDutySlot),
 				},
-				PostDutyRunnerStateRoot: "1f36f48d47628bca043ccc2cd39ead3fe56e64074aaa08fb34363e33e3a0cd47",
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
-				DontStartDuty:           true,
-				ExpectedError:           err,
+				BeaconBroadcastedRoots: []string{
+					testingutils.GetSSZRootNoError(testingutils.TestingSignedAttestation(ks)),
+				},
 			},
 		},
 	}
+
+	// proposerV creates a test specification for versioned proposer.
+	proposerV := func(version spec.DataVersion) *tests.MsgProcessingSpecTest {
+		return &tests.MsgProcessingSpecTest{
+			Name:   fmt.Sprintf("proposer (%s)", version.String()),
+			Runner: testingutils.ProposerRunner(ks),
+			Duty:   testingutils.TestingProposerDutyV(version),
+			Messages: append(
+				testingutils.SSVDecidingMsgsV(
+					testingutils.TestProposerConsensusDataV(version),
+					ks,
+					types.BNRoleProposer,
+				), // consensus
+				// post consensus
+				testingutils.SSVMsgProposer(nil, testingutils.PostConsensusProposerMsgV(ks.Shares[1], 1, version)),
+				testingutils.SSVMsgProposer(nil, testingutils.PostConsensusProposerMsgV(ks.Shares[2], 2, version)),
+				testingutils.SSVMsgProposer(nil, testingutils.PostConsensusProposerMsgV(ks.Shares[3], 3, version)),
+				// commit msg
+				testingutils.SSVMsgProposer(
+					testingutils.TestingCommitMultiSignerMessageWithHeightIdentifierAndFullData(
+						[]*bls.SecretKey{ks.Shares[4]},
+						[]types.OperatorID{4},
+						qbft.Height(testingutils.TestingDutySlotV(version)),
+						testingutils.ProposerMsgID,
+						testingutils.TestProposerConsensusDataBytsV(version),
+					), nil),
+			),
+			PostDutyRunnerStateRoot: postFinishProposerSC(version).Root(),
+			PostDutyRunnerState:     postFinishProposerSC(version).ExpectedState,
+			OutputMessages: []*types.SignedPartialSignatureMessage{
+				testingutils.PreConsensusRandaoMsgV(ks.Shares[1], 1, version),
+				testingutils.PostConsensusProposerMsgV(ks.Shares[1], 1, version),
+			},
+			BeaconBroadcastedRoots: []string{
+				testingutils.GetSSZRootNoError(testingutils.TestingSignedBeaconBlockV(ks, version)),
+			},
+		}
+	}
+
+	// proposerBlindedV creates a test specification for versioned proposer with blinded block.
+	proposerBlindedV := func(version spec.DataVersion) *tests.MsgProcessingSpecTest {
+		return &tests.MsgProcessingSpecTest{
+			Name:   fmt.Sprintf("proposer blinded block (%s)", version.String()),
+			Runner: testingutils.ProposerBlindedBlockRunner(ks),
+			Duty:   testingutils.TestingProposerDutyV(version),
+			Messages: append(
+				testingutils.SSVDecidingMsgsV(testingutils.TestProposerBlindedBlockConsensusDataV(version), ks, types.BNRoleProposer), // consensus
+				// post consensus
+				testingutils.SSVMsgProposer(nil, testingutils.PostConsensusProposerMsgV(ks.Shares[1], 1, version)),
+				testingutils.SSVMsgProposer(nil, testingutils.PostConsensusProposerMsgV(ks.Shares[2], 2, version)),
+				testingutils.SSVMsgProposer(nil, testingutils.PostConsensusProposerMsgV(ks.Shares[3], 3, version)),
+				// commit msg
+				testingutils.SSVMsgProposer(
+					testingutils.TestingCommitMultiSignerMessageWithHeightIdentifierAndFullData(
+						[]*bls.SecretKey{ks.Shares[4]},
+						[]types.OperatorID{4},
+						qbft.Height(testingutils.TestingDutySlotV(version)),
+						testingutils.ProposerMsgID,
+						testingutils.TestProposerBlindedBlockConsensusDataBytsV(version),
+					), nil),
+			),
+			PostDutyRunnerStateRoot: postFinishBlindedProposerSC(version).Root(),
+			PostDutyRunnerState:     postFinishBlindedProposerSC(version).ExpectedState,
+			OutputMessages: []*types.SignedPartialSignatureMessage{
+				testingutils.PreConsensusRandaoMsgV(ks.Shares[1], 1, version),
+				testingutils.PostConsensusProposerMsgV(ks.Shares[1], 1, version),
+			},
+			BeaconBroadcastedRoots: []string{
+				testingutils.GetSSZRootNoError(testingutils.TestingSignedBeaconBlockV(ks, version)),
+			},
+		}
+	}
+
+	for _, v := range testingutils.SupportedBlockVersions {
+		multiSpecTest.Tests = append(multiSpecTest.Tests, []*tests.MsgProcessingSpecTest{proposerV(v), proposerBlindedV(v)}...)
+	}
+
+	return multiSpecTest
 }

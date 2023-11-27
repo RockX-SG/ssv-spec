@@ -1,26 +1,23 @@
 package latemsg
 
 import (
+	"github.com/herumi/bls-eth-go-binary/bls"
+
 	"github.com/bloxapp/ssv-spec/qbft"
 	"github.com/bloxapp/ssv-spec/qbft/spectest/tests"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
-	"github.com/herumi/bls-eth-go-binary/bls"
+	"github.com/bloxapp/ssv-spec/types/testingutils/comparable"
 )
 
 // LateProposal tests process late proposal msg for an instance which just decided
-func LateProposal() *tests.ControllerSpecTest {
-	identifier := types.NewMsgID(testingutils.TestingValidatorPubKey[:], types.BNRoleAttester)
+func LateProposal() tests.SpecTest {
 	ks := testingutils.Testing4SharesSet()
+	sc := lateProposalStateComparison()
 
-	msgs := testingutils.DecidingMsgsForHeight([]byte{1, 2, 3, 4}, identifier[:], qbft.FirstHeight, ks)
-	msgs = append(msgs, testingutils.SignQBFTMsg(ks.Shares[1], 1, &qbft.Message{
-		MsgType:    qbft.ProposalMsgType,
-		Height:     qbft.FirstHeight,
-		Round:      qbft.FirstRound,
-		Identifier: identifier[:],
-		Data:       testingutils.CommitDataBytes([]byte{1, 2, 3, 4}),
-	}))
+	msgs := testingutils.DecidingMsgsForHeightWithRoot(testingutils.TestingQBFTRootData,
+		testingutils.TestingQBFTFullData, testingutils.TestingIdentifier, qbft.FirstHeight, ks)
+	msgs = append(msgs, testingutils.TestingProposalMessage(ks.Shares[1], 1))
 
 	return &tests.ControllerSpecTest{
 		Name: "late proposal",
@@ -29,22 +26,49 @@ func LateProposal() *tests.ControllerSpecTest {
 				InputValue:    []byte{1, 2, 3, 4},
 				InputMessages: msgs,
 				ExpectedDecidedState: tests.DecidedState{
-					DecidedVal: []byte{1, 2, 3, 4},
+					DecidedVal: testingutils.TestingQBFTFullData,
 					DecidedCnt: 1,
-					BroadcastedDecided: testingutils.MultiSignQBFTMsg(
+					BroadcastedDecided: testingutils.TestingCommitMultiSignerMessage(
 						[]*bls.SecretKey{ks.Shares[1], ks.Shares[2], ks.Shares[3]},
 						[]types.OperatorID{1, 2, 3},
-						&qbft.Message{
-							MsgType:    qbft.CommitMsgType,
-							Height:     qbft.FirstHeight,
-							Round:      qbft.FirstRound,
-							Identifier: identifier[:],
-							Data:       testingutils.CommitDataBytes([]byte{1, 2, 3, 4}),
-						}),
+					),
 				},
-				ControllerPostRoot: "0370be5066cbbf1efead61d9b182309afd989b3b720163f7029cbad79537eb4b",
+				ControllerPostRoot:  sc.Root(),
+				ControllerPostState: sc.ExpectedState,
 			},
 		},
-		ExpectedError: "could not process msg: proposal invalid: proposal is not valid with current state",
+		ExpectedError: "could not process msg: invalid signed message: proposal is not valid with current state",
 	}
+}
+
+// LateProposalStateComparison returns the expected state comparison for LateProposal test.
+// The controller is initialized with 4 shares and deciding messages for the first height from 3 nodes.
+// The late msg is invalid since it is a proposal for the first height and the instance already decided, so it is ignored.
+func lateProposalStateComparison() *comparable.StateComparison {
+	ks := testingutils.Testing4SharesSet()
+	msgs := testingutils.ExpectedDecidingMsgsForHeightWithRoot(testingutils.TestingQBFTRootData, testingutils.TestingQBFTFullData, testingutils.TestingIdentifier, qbft.FirstHeight, ks)
+
+	contr := testingutils.NewTestingQBFTController(
+		testingutils.TestingIdentifier,
+		testingutils.TestingShare(testingutils.Testing4SharesSet()),
+		testingutils.TestingConfig(testingutils.Testing4SharesSet()),
+	)
+
+	instance := &qbft.Instance{
+		StartValue: []byte{1, 2, 3, 4},
+		State: &qbft.State{
+			Share:                           testingutils.TestingShare(testingutils.Testing4SharesSet()),
+			ID:                              testingutils.TestingIdentifier,
+			ProposalAcceptedForCurrentRound: testingutils.TestingProposalMessage(ks.Shares[1], types.OperatorID(1)),
+			LastPreparedRound:               qbft.FirstRound,
+			LastPreparedValue:               testingutils.TestingQBFTFullData,
+			Decided:                         true,
+			DecidedValue:                    testingutils.TestingQBFTFullData,
+			Round:                           qbft.FirstRound,
+		},
+	}
+	comparable.SetSignedMessages(instance, msgs)
+	contr.StoredInstances = append(contr.StoredInstances, instance)
+
+	return &comparable.StateComparison{ExpectedState: contr}
 }

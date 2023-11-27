@@ -1,15 +1,16 @@
 package postconsensus
 
 import (
+	"github.com/attestantio/go-eth2-client/spec"
+
 	"github.com/bloxapp/ssv-spec/qbft"
-	"github.com/bloxapp/ssv-spec/ssv"
 	"github.com/bloxapp/ssv-spec/ssv/spectest/tests"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
 )
 
 // PostFinish  tests a valid SignedPartialSignatureMessage post finished runner
-func PostFinish() *tests.MultiMsgProcessingSpecTest {
+func PostFinish() tests.SpecTest {
 	ks := testingutils.Testing4SharesSet()
 	err := "failed processing post consensus message: invalid post-consensus message: no running duty"
 	return &tests.MultiMsgProcessingSpecTest{
@@ -19,15 +20,15 @@ func PostFinish() *tests.MultiMsgProcessingSpecTest {
 				Name: "sync committee contribution",
 				Runner: finishRunner(
 					testingutils.SyncCommitteeContributionRunner(ks),
-					testingutils.TestingSyncCommitteeContributionDuty,
+					&testingutils.TestingSyncCommitteeContributionDuty,
 					testingutils.TestSyncCommitteeContributionConsensusData,
 				),
-				Duty: testingutils.TestingSyncCommitteeContributionDuty,
+				Duty: &testingutils.TestingSyncCommitteeContributionDuty,
 				Messages: []*types.SSVMessage{
 					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PostConsensusSyncCommitteeContributionMsg(ks.Shares[4], 4, ks)),
 				},
-				PostDutyRunnerStateRoot: "46f77998e6bcdaece30a3da8e4a40fdb75d249b0e991082f347e14c8eea99876",
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
+				PostDutyRunnerStateRoot: "122821beec6412f898b5bb3862016591f1bb08af1513828d4d671a379402c117",
+				OutputMessages:          []*types.SignedPartialSignatureMessage{},
 				BeaconBroadcastedRoots:  []string{},
 				DontStartDuty:           true,
 				ExpectedError:           err,
@@ -36,15 +37,15 @@ func PostFinish() *tests.MultiMsgProcessingSpecTest {
 				Name: "sync committee",
 				Runner: finishRunner(
 					testingutils.SyncCommitteeRunner(ks),
-					testingutils.TestingSyncCommitteeDuty,
+					&testingutils.TestingSyncCommitteeDuty,
 					testingutils.TestSyncCommitteeConsensusData,
 				),
-				Duty: testingutils.TestingSyncCommitteeDuty,
+				Duty: &testingutils.TestingSyncCommitteeDuty,
 				Messages: []*types.SSVMessage{
 					testingutils.SSVMsgSyncCommittee(nil, testingutils.PostConsensusSyncCommitteeMsg(ks.Shares[4], 4)),
 				},
-				PostDutyRunnerStateRoot: "5a0ee4275c67c36a6957cd1624231ecb50b3e49a101e3f9c1872093a13dea15b",
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
+				PostDutyRunnerStateRoot: "43d4404e8bb20f18d68dd9bfacf06c3ebce8a1cdf686b83ec09690af5ba0318e",
+				OutputMessages:          []*types.SignedPartialSignatureMessage{},
 				BeaconBroadcastedRoots:  []string{},
 				DontStartDuty:           true,
 				ExpectedError:           err,
@@ -53,15 +54,32 @@ func PostFinish() *tests.MultiMsgProcessingSpecTest {
 				Name: "proposer",
 				Runner: finishRunner(
 					testingutils.ProposerRunner(ks),
-					testingutils.TestingProposerDuty,
-					testingutils.TestProposerConsensusData,
+					testingutils.TestingProposerDutyV(spec.DataVersionBellatrix),
+					testingutils.TestProposerConsensusDataV(spec.DataVersionBellatrix),
 				),
-				Duty: testingutils.TestingProposerDuty,
+				Duty: testingutils.TestingProposerDutyV(spec.DataVersionBellatrix),
 				Messages: []*types.SSVMessage{
-					testingutils.SSVMsgProposer(nil, testingutils.PostConsensusProposerMsg(ks.Shares[4], 4)),
+					testingutils.SSVMsgProposer(nil, testingutils.PostConsensusProposerMsgV(ks.Shares[4], 4, spec.DataVersionBellatrix)),
 				},
-				PostDutyRunnerStateRoot: "14f1e940bf7fa4460cb7953f055a18c1ad868d686cc4ed434229e4d27f76bbeb",
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
+				PostDutyRunnerStateRoot: "cef894bfee42ce998eeccd3bfbb21caebbe6226384466e66ee296d8c5d0e4521",
+				OutputMessages:          []*types.SignedPartialSignatureMessage{},
+				BeaconBroadcastedRoots:  []string{},
+				DontStartDuty:           true,
+				ExpectedError:           err,
+			},
+			{
+				Name: "proposer (blinded block)",
+				Runner: finishRunner(
+					testingutils.ProposerBlindedBlockRunner(ks),
+					testingutils.TestingProposerDutyV(spec.DataVersionBellatrix),
+					testingutils.TestProposerBlindedBlockConsensusDataV(spec.DataVersionBellatrix),
+				),
+				Duty: testingutils.TestingProposerDutyV(spec.DataVersionBellatrix),
+				Messages: []*types.SSVMessage{
+					testingutils.SSVMsgProposer(nil, testingutils.PostConsensusProposerMsgV(ks.Shares[4], 4, spec.DataVersionBellatrix)),
+				},
+				PostDutyRunnerStateRoot: "68050789dfbfaa7d82d7ce6ed910be9580c61b4de8c8b72e9258efc9580b5e04",
+				OutputMessages:          []*types.SignedPartialSignatureMessage{},
 				BeaconBroadcastedRoots:  []string{},
 				DontStartDuty:           true,
 				ExpectedError:           err,
@@ -70,15 +88,15 @@ func PostFinish() *tests.MultiMsgProcessingSpecTest {
 				Name: "aggregator",
 				Runner: finishRunner(
 					testingutils.AggregatorRunner(ks),
-					testingutils.TestingAggregatorDuty,
+					&testingutils.TestingAggregatorDuty,
 					testingutils.TestAggregatorConsensusData,
 				),
-				Duty: testingutils.TestingAggregatorDuty,
+				Duty: &testingutils.TestingAggregatorDuty,
 				Messages: []*types.SSVMessage{
 					testingutils.SSVMsgAggregator(nil, testingutils.PostConsensusAggregatorMsg(ks.Shares[4], 4)),
 				},
-				PostDutyRunnerStateRoot: "b9d50b7ce3ec671ec093e4dbc64e8d7669ad7af6bdb295ebefdb7ca12689afc7",
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
+				PostDutyRunnerStateRoot: "7c0857b766096e33a04cb5043418ba8d69081998b6584b179051c2ab92413a0d",
+				OutputMessages:          []*types.SignedPartialSignatureMessage{},
 				BeaconBroadcastedRoots:  []string{},
 				DontStartDuty:           true,
 				ExpectedError:           err,
@@ -87,15 +105,15 @@ func PostFinish() *tests.MultiMsgProcessingSpecTest {
 				Name: "attester",
 				Runner: finishRunner(
 					testingutils.AttesterRunner(ks),
-					testingutils.TestingAttesterDuty,
+					&testingutils.TestingAttesterDuty,
 					testingutils.TestAttesterConsensusData,
 				),
-				Duty: testingutils.TestingProposerDuty,
+				Duty: testingutils.TestingProposerDutyV(spec.DataVersionBellatrix),
 				Messages: []*types.SSVMessage{
 					testingutils.SSVMsgAttester(nil, testingutils.PostConsensusAttestationMsg(ks.Shares[4], 4, qbft.FirstHeight)),
 				},
-				PostDutyRunnerStateRoot: "6165041016fe20c33b0a744c3f45d121887c9ac8aab3bb222a41d05c1005c318",
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
+				PostDutyRunnerStateRoot: "8e21027a3f7f1a8b4507beefee7fa1d242e4bec09fae83fb489a349e64f7ee34",
+				OutputMessages:          []*types.SignedPartialSignatureMessage{},
 				BeaconBroadcastedRoots:  []string{},
 				DontStartDuty:           true,
 				ExpectedError:           err,

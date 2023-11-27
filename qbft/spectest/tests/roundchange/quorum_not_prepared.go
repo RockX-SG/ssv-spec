@@ -8,47 +8,25 @@ import (
 )
 
 // QuorumNotPrepared tests a round change quorum for non-prepared state
-func QuorumNotPrepared() *tests.MsgProcessingSpecTest {
+func QuorumNotPrepared() tests.SpecTest {
 	pre := testingutils.BaseInstance()
 	pre.State.Round = 2
+	ks := testingutils.Testing4SharesSet()
 
 	msgs := []*qbft.SignedMessage{
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.RoundChangeMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      2,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.RoundChangeDataBytes(nil, qbft.NoRound),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[2], types.OperatorID(2), &qbft.Message{
-			MsgType:    qbft.RoundChangeMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      2,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.RoundChangeDataBytes(nil, qbft.NoRound),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[3], types.OperatorID(3), &qbft.Message{
-			MsgType:    qbft.RoundChangeMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      2,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.RoundChangeDataBytes(nil, qbft.NoRound),
-		}),
+		testingutils.TestingRoundChangeMessageWithRound(ks.Shares[1], types.OperatorID(1), 2),
+		testingutils.TestingRoundChangeMessageWithRound(ks.Shares[2], types.OperatorID(2), 2),
+		testingutils.TestingRoundChangeMessageWithRound(ks.Shares[3], types.OperatorID(3), 2),
 	}
 
 	return &tests.MsgProcessingSpecTest{
 		Name:          "round change not prepared",
 		Pre:           pre,
-		PostRoot:      "1c4727292dfab7272506b272505b982ebf0cf6cdca26e70a381ffc3619ebf5f2",
+		PostRoot:      "595889ae5096cb343497314ab7ea82299f8d05d01de3fad6902bfb559d5356ec",
 		InputMessages: msgs,
 		OutputMessages: []*qbft.SignedMessage{
-			testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-				MsgType:    qbft.ProposalMsgType,
-				Height:     qbft.FirstHeight,
-				Round:      2,
-				Identifier: []byte{1, 2, 3, 4},
-				Data:       testingutils.ProposalDataBytes([]byte{1, 2, 3, 4}, msgs, nil),
-			}),
+			testingutils.TestingProposalMessageWithRoundAndRC(ks.Shares[1], types.OperatorID(1), 2,
+				testingutils.MarshalJustifications(msgs)),
 		},
 	}
 }

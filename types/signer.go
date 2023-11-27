@@ -2,22 +2,14 @@ package types
 
 import (
 	"bytes"
-	"crypto/rsa"
-
-	"github.com/attestantio/go-eth2-client/spec/bellatrix"
 	spec "github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/ethereum/go-ethereum/common"
 	ssz "github.com/ferranbt/fastssz"
 	"github.com/herumi/bls-eth-go-binary/bls"
 )
 
-// DomainType is a unique identifier for signatures, 2 identical pieces of data signed with different domains will result in different sigs
-type DomainType []byte
-
-var (
-	PrimusTestnet = DomainType("primus_testnet")
-	ShifuTestnet  = DomainType("shifu_testnet")
-)
+type SignatureDomain []byte
+type Signature []byte
 
 type SignatureType [4]byte
 
@@ -31,26 +23,17 @@ var (
 	DKGSignatureType     SignatureType = [4]byte{3, 0, 0, 0}
 )
 
-// EncryptionCalls captures all RSA share encryption calls
-type EncryptionCalls interface {
-	// Decrypt given a rsa pubkey and a PKCS1v15 cipher text byte array, returns the decrypted data
-	Decrypt(pk *rsa.PrivateKey, cipher []byte) ([]byte, error)
-	// Encrypt given a rsa pubkey and data returns an PKCS1v15 encrypted cipher
-	Encrypt(pk *rsa.PublicKey, data []byte) ([]byte, error)
-}
-
 type BeaconSigner interface {
 	// SignBeaconObject returns signature and root.
-	SignBeaconObject(obj ssz.HashRoot, domain spec.Domain, pk []byte) (Signature, []byte, error)
+	SignBeaconObject(obj ssz.HashRoot, domain spec.Domain, pk []byte, domainType spec.DomainType) (Signature, [32]byte, error)
 	// IsAttestationSlashable returns error if attestation is slashable
-	IsAttestationSlashable(data *spec.AttestationData) error
-	// IsBeaconBlockSlashable returns true if the given block is slashable
-	IsBeaconBlockSlashable(block *bellatrix.BeaconBlock) error
+	IsAttestationSlashable(pk []byte, data *spec.AttestationData) error
+	// IsBeaconBlockSlashable returns error if the given block is slashable
+	IsBeaconBlockSlashable(pk []byte, slot spec.Slot) error
 }
 
 // SSVSigner used for all SSV specific signing
 type SSVSigner interface {
-	EncryptionCalls
 	SignRoot(data Root, sigType SignatureType, pk []byte) (Signature, error)
 }
 

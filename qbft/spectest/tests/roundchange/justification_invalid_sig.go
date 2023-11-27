@@ -8,49 +8,27 @@ import (
 )
 
 // JustificationInvalidSig tests a single prepare justification msg with wrong signature
-func JustificationInvalidSig() *tests.MsgProcessingSpecTest {
+func JustificationInvalidSig() tests.SpecTest {
 	pre := testingutils.BaseInstance()
 	pre.State.Round = 2
+	ks := testingutils.Testing4SharesSet()
 
 	prepareMsgs := []*qbft.SignedMessage{
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.PrepareMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.PrepareDataBytes([]byte{1, 2, 3, 4}),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[2], types.OperatorID(2), &qbft.Message{
-			MsgType:    qbft.PrepareMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.PrepareDataBytes([]byte{1, 2, 3, 4}),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[3], types.OperatorID(2), &qbft.Message{
-			MsgType:    qbft.PrepareMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.PrepareDataBytes([]byte{1, 2, 3, 4}),
-		}),
+		testingutils.TestingPrepareMessage(ks.Shares[1], types.OperatorID(1)),
+		testingutils.TestingPrepareMessage(ks.Shares[2], types.OperatorID(2)),
+		testingutils.TestingPrepareMessage(ks.Shares[3], types.OperatorID(2)),
 	}
 	msgs := []*qbft.SignedMessage{
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.RoundChangeMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      2,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.RoundChangePreparedDataBytes([]byte{1, 2, 3, 4}, qbft.FirstRound, prepareMsgs),
-		}),
+		testingutils.TestingRoundChangeMessageWithRoundAndRC(ks.Shares[1], types.OperatorID(1), 2,
+			testingutils.MarshalJustifications(prepareMsgs)),
 	}
 
 	return &tests.MsgProcessingSpecTest{
 		Name:           "justification invalid sig",
 		Pre:            pre,
-		PostRoot:       "4aafcc4aa9e2435579c85aa26e659fe650aefb8becb5738d32dd9286f7ff27c3",
+		PostRoot:       "ddb0f7e1a8888a8de5295005872d8525d6afea053121993dc65e34fcb7f290b2",
 		InputMessages:  msgs,
 		OutputMessages: []*qbft.SignedMessage{},
-		ExpectedError:  "round change msg invalid: round change justification invalid: prepare msg signature invalid: failed to verify signature",
+		ExpectedError:  "invalid signed message: round change justification invalid: msg signature invalid: failed to verify signature",
 	}
 }

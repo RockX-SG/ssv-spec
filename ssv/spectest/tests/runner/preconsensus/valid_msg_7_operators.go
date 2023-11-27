@@ -1,14 +1,15 @@
 package preconsensus
 
 import (
-	"github.com/bloxapp/ssv-spec/ssv"
+	"github.com/attestantio/go-eth2-client/spec"
+
 	"github.com/bloxapp/ssv-spec/ssv/spectest/tests"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
 )
 
 // ValidMessage7Operators tests a valid SignedPartialSignatureMessage with multi PartialSignatureMessages (7 operators)
-func ValidMessage7Operators() *tests.MultiMsgProcessingSpecTest {
+func ValidMessage7Operators() tests.SpecTest {
 	ks := testingutils.Testing7SharesSet()
 	return &tests.MultiMsgProcessingSpecTest{
 		Name: "pre consensus valid msg 7 operators",
@@ -16,46 +17,61 @@ func ValidMessage7Operators() *tests.MultiMsgProcessingSpecTest {
 			{
 				Name:   "sync committee aggregator selection proof",
 				Runner: testingutils.SyncCommitteeContributionRunner(ks),
-				Duty:   testingutils.TestingSyncCommitteeContributionDuty,
+				Duty:   &testingutils.TestingSyncCommitteeContributionDuty,
 				Messages: []*types.SSVMessage{
 					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PreConsensusContributionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1)),
 					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PreConsensusContributionProofMsg(ks.Shares[2], ks.Shares[2], 2, 2)),
 					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PreConsensusContributionProofMsg(ks.Shares[3], ks.Shares[3], 3, 3)),
 					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PreConsensusContributionProofMsg(ks.Shares[4], ks.Shares[4], 4, 4)),
 				},
-				PostDutyRunnerStateRoot: "6bbafc3b1fb3bb6a003a62ec2dd00191f991c3d23b7c03e469d757fc35cda23e",
-				OutputMessages: []*ssv.SignedPartialSignatureMessage{
+				PostDutyRunnerStateRoot: "9325b8659fae01c677a3b012b11850a7902c4e7043cbaf7d7a110fce3eaf891f",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
 					testingutils.PreConsensusContributionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1), // broadcasts when starting a new duty
 				},
 			},
 			{
 				Name:   "aggregator selection proof",
 				Runner: testingutils.AggregatorRunner(ks),
-				Duty:   testingutils.TestingAggregatorDuty,
+				Duty:   &testingutils.TestingAggregatorDuty,
 				Messages: []*types.SSVMessage{
 					testingutils.SSVMsgAggregator(nil, testingutils.PreConsensusSelectionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1)),
 					testingutils.SSVMsgAggregator(nil, testingutils.PreConsensusSelectionProofMsg(ks.Shares[2], ks.Shares[2], 2, 2)),
 					testingutils.SSVMsgAggregator(nil, testingutils.PreConsensusSelectionProofMsg(ks.Shares[3], ks.Shares[3], 3, 3)),
 					testingutils.SSVMsgAggregator(nil, testingutils.PreConsensusSelectionProofMsg(ks.Shares[4], ks.Shares[4], 4, 4)),
 				},
-				PostDutyRunnerStateRoot: "c671a83d8f6a5d8641fc5ce094a9fdb3d1eb8c61b3952a37eef822c439dfa0de",
-				OutputMessages: []*ssv.SignedPartialSignatureMessage{
+				PostDutyRunnerStateRoot: "2f5be659d42b520f692a2aa2d0a6e362ca82c1aea20c790fd67d12b17e08d382",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
 					testingutils.PreConsensusSelectionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1), // broadcasts when starting a new duty
 				},
 			},
 			{
 				Name:   "randao",
 				Runner: testingutils.ProposerRunner(ks),
-				Duty:   testingutils.TestingProposerDuty,
+				Duty:   testingutils.TestingProposerDutyV(spec.DataVersionBellatrix),
 				Messages: []*types.SSVMessage{
-					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsg(ks.Shares[1], ks.Shares[1], 1, 1)),
-					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsg(ks.Shares[2], ks.Shares[2], 2, 2)),
-					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsg(ks.Shares[3], ks.Shares[3], 3, 3)),
-					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsg(ks.Shares[4], ks.Shares[4], 4, 4)),
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[1], ks.Shares[1], 1, 1, spec.DataVersionBellatrix)),
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[2], ks.Shares[2], 2, 2, spec.DataVersionBellatrix)),
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[3], ks.Shares[3], 3, 3, spec.DataVersionBellatrix)),
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[4], ks.Shares[4], 4, 4, spec.DataVersionBellatrix)),
 				},
-				PostDutyRunnerStateRoot: "1f7d6064e93d9cf516dc91b78953a1f12107aea21fdf67e5e6c853103759edf5",
-				OutputMessages: []*ssv.SignedPartialSignatureMessage{
-					testingutils.PreConsensusRandaoMsg(ks.Shares[1], 1), // broadcasts when starting a new duty
+				PostDutyRunnerStateRoot: "fa6e27d8da34c0ada6d94280119f979189c53838fd463214b0b4b66c8e3be9c9",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
+					testingutils.PreConsensusRandaoMsgV(ks.Shares[1], 1, spec.DataVersionBellatrix), // broadcasts when starting a new duty
+				},
+			},
+			{
+				Name:   "randao (blinded block)",
+				Runner: testingutils.ProposerBlindedBlockRunner(ks),
+				Duty:   testingutils.TestingProposerDutyV(spec.DataVersionBellatrix),
+				Messages: []*types.SSVMessage{
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[1], ks.Shares[1], 1, 1, spec.DataVersionBellatrix)),
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[2], ks.Shares[2], 2, 2, spec.DataVersionBellatrix)),
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[3], ks.Shares[3], 3, 3, spec.DataVersionBellatrix)),
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[4], ks.Shares[4], 4, 4, spec.DataVersionBellatrix)),
+				},
+				PostDutyRunnerStateRoot: "b79c2753e26034a760d6e4b47d758e65b8bc2f9b45a7d5daff0a6b8c0df1a78c",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
+					testingutils.PreConsensusRandaoMsgV(ks.Shares[1], 1, spec.DataVersionBellatrix), // broadcasts when starting a new duty
 				},
 			},
 		},

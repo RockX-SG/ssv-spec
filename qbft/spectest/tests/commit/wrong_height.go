@@ -3,71 +3,32 @@ package commit
 import (
 	"github.com/bloxapp/ssv-spec/qbft"
 	"github.com/bloxapp/ssv-spec/qbft/spectest/tests"
-	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
 )
 
 // WrongHeight tests a commit msg received with the wrong height
-func WrongHeight() *tests.MsgProcessingSpecTest {
+func WrongHeight() tests.SpecTest {
 	pre := testingutils.BaseInstance()
+	ks := testingutils.Testing4SharesSet()
+
 	msgs := []*qbft.SignedMessage{
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.ProposalMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.ProposalDataBytes([]byte{1, 2, 3, 4}, nil, nil),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.PrepareMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.PrepareDataBytes([]byte{1, 2, 3, 4}),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[2], types.OperatorID(2), &qbft.Message{
-			MsgType:    qbft.PrepareMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.PrepareDataBytes([]byte{1, 2, 3, 4}),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[3], types.OperatorID(3), &qbft.Message{
-			MsgType:    qbft.PrepareMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.PrepareDataBytes([]byte{1, 2, 3, 4}),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.CommitMsgType,
-			Height:     10,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.CommitDataBytes([]byte{1, 2, 3, 4}),
-		}),
+		testingutils.TestingProposalMessage(ks.Shares[1], 1),
+
+		testingutils.TestingPrepareMessage(ks.Shares[1], 1),
+		testingutils.TestingPrepareMessage(ks.Shares[2], 2),
+		testingutils.TestingPrepareMessage(ks.Shares[3], 3),
+
+		testingutils.TestingCommitMessageWrongHeight(ks.Shares[1], 1),
 	}
 	return &tests.MsgProcessingSpecTest{
 		Name:          "wrong commit height",
 		Pre:           pre,
-		PostRoot:      "a272dbf34be030245fcc44b3210f3137e0cc47e745d0130584de7ff17a47123f",
+		PostRoot:      "976cd5cecd58bba892a38ec0ef02b3aed4656fb89fef473d8af78fedf095439d",
 		InputMessages: msgs,
-		ExpectedError: "commit msg invalid: invalid commit msg: commit Height is wrong",
+		ExpectedError: "invalid signed message: wrong msg height",
 		OutputMessages: []*qbft.SignedMessage{
-			testingutils.SignQBFTMsg(testingutils.Testing10SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-				MsgType:    qbft.PrepareMsgType,
-				Height:     qbft.FirstHeight,
-				Round:      qbft.FirstRound,
-				Identifier: []byte{1, 2, 3, 4},
-				Data:       testingutils.PrepareDataBytes([]byte{1, 2, 3, 4}),
-			}),
-			testingutils.SignQBFTMsg(testingutils.Testing10SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-				MsgType:    qbft.CommitMsgType,
-				Height:     qbft.FirstHeight,
-				Round:      qbft.FirstRound,
-				Identifier: []byte{1, 2, 3, 4},
-				Data:       testingutils.CommitDataBytes([]byte{1, 2, 3, 4}),
-			}),
+			testingutils.TestingPrepareMessage(ks.Shares[1], 1),
+			testingutils.TestingCommitMessage(ks.Shares[1], 1),
 		},
 	}
 }

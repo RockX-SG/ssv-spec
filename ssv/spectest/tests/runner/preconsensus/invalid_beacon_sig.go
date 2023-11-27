@@ -1,14 +1,15 @@
 package preconsensus
 
 import (
-	"github.com/bloxapp/ssv-spec/ssv"
+	"github.com/attestantio/go-eth2-client/spec"
+
 	"github.com/bloxapp/ssv-spec/ssv/spectest/tests"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
 )
 
 // InvalidBeaconSignature tests PartialSignatureMessage signature invalid
-func InvalidBeaconSignature() *tests.MultiMsgProcessingSpecTest {
+func InvalidBeaconSignature() tests.SpecTest {
 	ks := testingutils.Testing4SharesSet()
 	return &tests.MultiMsgProcessingSpecTest{
 		Name: "pre consensus invalid beacon signature",
@@ -16,12 +17,12 @@ func InvalidBeaconSignature() *tests.MultiMsgProcessingSpecTest {
 			{
 				Name:   "sync committee aggregator selection proof",
 				Runner: testingutils.SyncCommitteeContributionRunner(ks),
-				Duty:   testingutils.TestingSyncCommitteeContributionDuty,
+				Duty:   &testingutils.TestingSyncCommitteeContributionDuty,
 				Messages: []*types.SSVMessage{
-					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PreConsensusContributionProofMsg(ks.Shares[1], ks.Shares[1], 1, 2)),
+					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PreConsensusContributionProofWrongBeaconSigMsg(ks.Shares[1], ks.Shares[1], 1, 1)),
 				},
-				PostDutyRunnerStateRoot: "a5c4aab5b21e68e24be242ecebb90d4e711a0a77397e40dfbb6e7c67b5ff9d11",
-				OutputMessages: []*ssv.SignedPartialSignatureMessage{
+				PostDutyRunnerStateRoot: "29862cc6054edc8547efcb5ae753290971d664b9c39768503b4d66e1b52ecb06",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
 					testingutils.PreConsensusContributionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1), // broadcasts when starting a new duty
 				},
 				ExpectedError: "failed processing sync committee selection proof message: invalid pre-consensus message: could not verify Beacon partial Signature: wrong signature",
@@ -29,12 +30,12 @@ func InvalidBeaconSignature() *tests.MultiMsgProcessingSpecTest {
 			{
 				Name:   "aggregator selection proof",
 				Runner: testingutils.AggregatorRunner(ks),
-				Duty:   testingutils.TestingAggregatorDuty,
+				Duty:   &testingutils.TestingAggregatorDuty,
 				Messages: []*types.SSVMessage{
-					testingutils.SSVMsgAggregator(nil, testingutils.PreConsensusSelectionProofMsg(ks.Shares[1], ks.Shares[1], 1, 2)),
+					testingutils.SSVMsgAggregator(nil, testingutils.PreConsensusSelectionProofWrongBeaconSigMsg(ks.Shares[1], ks.Shares[1], 1, 1)),
 				},
-				PostDutyRunnerStateRoot: "2ced65306471d08e0de69c2016d90c0651df26b3d5e231f12944704a48f59339",
-				OutputMessages: []*ssv.SignedPartialSignatureMessage{
+				PostDutyRunnerStateRoot: "c54e71de23c3957b73abbb0e7b9e195b3f8f6370d62fbec256224faecf177fee",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
 					testingutils.PreConsensusSelectionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1), // broadcasts when starting a new duty
 				},
 				ExpectedError: "failed processing selection proof message: invalid pre-consensus message: could not verify Beacon partial Signature: wrong signature",
@@ -42,13 +43,26 @@ func InvalidBeaconSignature() *tests.MultiMsgProcessingSpecTest {
 			{
 				Name:   "randao",
 				Runner: testingutils.ProposerRunner(ks),
-				Duty:   testingutils.TestingProposerDuty,
+				Duty:   testingutils.TestingProposerDutyV(spec.DataVersionBellatrix),
 				Messages: []*types.SSVMessage{
-					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsg(ks.Shares[1], ks.Shares[1], 1, 2)),
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoWrongBeaconSigMsgV(ks.Shares[1], 1, spec.DataVersionBellatrix)),
 				},
-				PostDutyRunnerStateRoot: "d46ee9acb3d6b3386c80e3947e83ac73063be1607b7fdd4a011f9814978082c4",
-				OutputMessages: []*ssv.SignedPartialSignatureMessage{
-					testingutils.PreConsensusRandaoMsg(ks.Shares[1], 1), // broadcasts when starting a new duty
+				PostDutyRunnerStateRoot: "56eafcb33392ded888a0fefe30ba49e52aa00ab36841cb10c9dc1aa2935af347",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
+					testingutils.PreConsensusRandaoMsgV(ks.Shares[1], 1, spec.DataVersionBellatrix), // broadcasts when starting a new duty
+				},
+				ExpectedError: "failed processing randao message: invalid pre-consensus message: could not verify Beacon partial Signature: wrong signature",
+			},
+			{
+				Name:   "randao (blinded block)",
+				Runner: testingutils.ProposerBlindedBlockRunner(ks),
+				Duty:   testingutils.TestingProposerDutyV(spec.DataVersionBellatrix),
+				Messages: []*types.SSVMessage{
+					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoWrongBeaconSigMsgV(ks.Shares[1], 1, spec.DataVersionBellatrix)),
+				},
+				PostDutyRunnerStateRoot: "2ce3241658f324f352c77909f4043934eedf38e939ae638c5ce6acf28e965646",
+				OutputMessages: []*types.SignedPartialSignatureMessage{
+					testingutils.PreConsensusRandaoMsgV(ks.Shares[1], 1, spec.DataVersionBellatrix), // broadcasts when starting a new duty
 				},
 				ExpectedError: "failed processing randao message: invalid pre-consensus message: could not verify Beacon partial Signature: wrong signature",
 			},

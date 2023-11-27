@@ -8,30 +8,19 @@ import (
 )
 
 // F1DuplicateSignerNotPrepared tests not accepting f+1 speed for duplicate signer (not prev prepared)
-func F1DuplicateSignerNotPrepared() *tests.MsgProcessingSpecTest {
+func F1DuplicateSignerNotPrepared() tests.SpecTest {
 	pre := testingutils.BaseInstance()
+	ks := testingutils.Testing4SharesSet()
 
 	msgs := []*qbft.SignedMessage{
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.RoundChangeMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      2,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.RoundChangeDataBytes(nil, qbft.NoRound),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.RoundChangeMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      5,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.RoundChangeDataBytes(nil, qbft.NoRound),
-		}),
+		testingutils.TestingRoundChangeMessageWithRound(ks.Shares[1], types.OperatorID(1), 2),
+		testingutils.TestingRoundChangeMessageWithRound(ks.Shares[1], types.OperatorID(1), 5),
 	}
 
 	return &tests.MsgProcessingSpecTest{
 		Name:           "round change f+1 not duplicate prepared",
 		Pre:            pre,
-		PostRoot:       "bc5a316dbb31afa9717f22b7f09db244858b38ce024b00ab96c46f3a3a2f13e3",
+		PostRoot:       "6a7c1be9ab4c16a305f393c97744fd224bf1bbc2e627c04659d9e65d6cea571f",
 		InputMessages:  msgs,
 		OutputMessages: []*qbft.SignedMessage{},
 	}

@@ -3,8 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/bloxapp/ssv-spec/ssv/spectest/tests"
+	"github.com/bloxapp/ssv-spec/types"
+	comparable2 "github.com/bloxapp/ssv-spec/types/testingutils/comparable"
+	"github.com/pkg/errors"
+	"log"
 	"os"
+	"path/filepath"
 	"reflect"
+	"runtime"
+	"strings"
 
 	"github.com/bloxapp/ssv-spec/ssv/spectest"
 )
@@ -12,13 +20,18 @@ import (
 //go:generate go run main.go
 
 func main() {
-	all := map[string]spectest.SpecTest{}
-	for _, t := range spectest.AllTests {
-		n := reflect.TypeOf(t).String() + "_" + t.TestName()
+	clearStateComparisonFolder()
+
+	all := map[string]tests.SpecTest{}
+	for _, testF := range spectest.AllTests {
+		test := testF()
+
+		// write json test
+		n := reflect.TypeOf(test).String() + "_" + test.TestName()
 		if all[n] != nil {
 			panic(fmt.Sprintf("duplicate test: %s\n", n))
 		}
-		all[n] = t
+		all[n] = test
 	}
 
 	byts, err := json.Marshal(all)
@@ -30,18 +43,101 @@ func main() {
 		panic("did not generate all tests\n")
 	}
 
-	fmt.Printf("found %d tests\n", len(all))
+	log.Printf("found %d tests\n", len(all))
 	writeJson(byts)
+
+	for _, testF := range spectest.AllTests {
+		test := testF()
+
+		// generate post state comparison
+		post, err := test.GetPostState()
+		if err != nil {
+			err = errors.Wrapf(err, "failed to get post state for test: %s", test.TestName())
+			panic(err.Error())
+		}
+		writeJsonStateComparison(test.TestName(), reflect.TypeOf(test).String(), post)
+	}
+}
+
+func clearStateComparisonFolder() {
+	_, basedir, _, ok := runtime.Caller(0)
+	if !ok {
+		panic("no caller info")
+	}
+	dir := filepath.Join(strings.TrimSuffix(basedir, "main.go"), "state_comparison")
+
+	if err := os.RemoveAll(dir); err != nil {
+		panic(err.Error())
+	}
+
+	if err := os.Mkdir(dir, 0700); err != nil {
+		panic(err.Error())
+	}
+}
+
+func writeJsonStateComparison(name, testType string, post interface{}) {
+	postMap, ok := post.(map[string]types.Root)
+
+	if !ok {
+		writeSingleSCJson(name, testType, post)
+		return
+	}
+	name = strings.ReplaceAll(name, " ", "_")
+	for subTestName, postState := range postMap {
+		writeSingleSCJson(subTestName, filepath.Join(testType, name), postState)
+	}
+}
+
+func writeSingleSCJson(path string, testType string, post interface{}) {
+	if post == nil { // If nil, test not supporting post state comparison yet
+		log.Printf("skipping state comparison json, not supported: %s\n", path)
+		return
+	}
+	byts, err := json.MarshalIndent(post, "", "		")
+	if err != nil {
+		panic(err.Error())
+	}
+
+	scDir := scDir(testType)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	file := filepath.Join(scDir, fmt.Sprintf("%s.json", path))
+	// try to create directory if it doesn't exist
+	if err := os.MkdirAll(scDir, 0700); err != nil && !os.IsExist(err) {
+		panic(err.Error())
+	}
+
+	log.Printf("writing state comparison json: %s\n", file)
+	if err := os.WriteFile(file, byts, 0644); err != nil {
+		panic(err.Error())
+	}
+}
+
+func scDir(testType string) string {
+	_, basedir, _, ok := runtime.Caller(0)
+	if !ok {
+		panic("no caller info")
+	}
+	basedir = strings.TrimSuffix(basedir, "main.go")
+	scDir := comparable2.GetSCDir(basedir, testType)
+	return scDir
 }
 
 func writeJson(data []byte) {
-	basedir, _ := os.Getwd()
-	//path := filepath.Join(basedir, "ssv", "spectest", "generate")
-	fileName := "tests.json"
-	fullPath := basedir + "/" + fileName
+	_, basedir, _, ok := runtime.Caller(0)
+	if !ok {
+		panic("no caller info")
+	}
+	basedir = strings.TrimSuffix(basedir, "main.go")
 
-	fmt.Printf("writing spec tests json to: %s\n", fullPath)
-	if err := os.WriteFile(fullPath, data, 0644); err != nil {
+	// try to create directory if it doesn't exist
+	_ = os.Mkdir(basedir, os.ModeDir)
+
+	file := filepath.Join(basedir, "tests.json")
+	log.Printf("writing spec tests json to: %s\n", file)
+	if err := os.WriteFile(file, data, 0644); err != nil {
 		panic(err.Error())
 	}
 }

@@ -8,30 +8,20 @@ import (
 )
 
 // FutureRound tests prepare for signedProposal.Message.Round > state.Round
-func FutureRound() *tests.MsgProcessingSpecTest {
+func FutureRound() tests.SpecTest {
+	ks := testingutils.Testing4SharesSet()
+
 	pre := testingutils.BaseInstance()
-	pre.State.ProposalAcceptedForCurrentRound = testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-		MsgType:    qbft.ProposalMsgType,
-		Height:     qbft.FirstHeight,
-		Round:      qbft.FirstRound,
-		Identifier: []byte{1, 2, 3, 4},
-		Data:       testingutils.ProposalDataBytes([]byte{1, 2, 3, 4}, nil, nil),
-	})
+	pre.State.ProposalAcceptedForCurrentRound = testingutils.TestingProposalMessage(ks.Shares[1], types.OperatorID(1))
 
 	msgs := []*qbft.SignedMessage{
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.PrepareMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      3,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.PrepareDataBytes([]byte{1, 2, 3, 4}),
-		}),
+		testingutils.TestingPrepareMessageWithRound(ks.Shares[1], types.OperatorID(1), 3),
 	}
 	return &tests.MsgProcessingSpecTest{
 		Name:          "prepare future round",
 		Pre:           pre,
-		PostRoot:      "be41977d818071451988105377df7c5ccf89ecc05ddf033b7b3b83d89f52d530",
+		PostRoot:      "b61f5233721865ca43afc68f4ad5045eeb123f6e8f095ce76ecf956dabc74713",
 		InputMessages: msgs,
-		ExpectedError: "invalid prepare msg: msg round wrong",
+		ExpectedError: "invalid signed message: wrong msg round",
 	}
 }

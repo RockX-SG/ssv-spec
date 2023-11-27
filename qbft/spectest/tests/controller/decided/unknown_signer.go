@@ -9,8 +9,7 @@ import (
 )
 
 // UnknownSigner tests a decided msg with an unknown signer
-func UnknownSigner() *tests.ControllerSpecTest {
-	identifier := types.NewMsgID(testingutils.TestingValidatorPubKey[:], types.BNRoleAttester)
+func UnknownSigner() tests.SpecTest {
 	ks := testingutils.Testing4SharesSet()
 	return &tests.ControllerSpecTest{
 		Name: "decide unknown signer",
@@ -18,20 +17,11 @@ func UnknownSigner() *tests.ControllerSpecTest {
 			{
 				InputValue: []byte{1, 2, 3, 4},
 				InputMessages: []*qbft.SignedMessage{
-					testingutils.MultiSignQBFTMsg(
-						[]*bls.SecretKey{ks.Shares[1], ks.Shares[2], ks.Shares[3]},
-						[]types.OperatorID{1, 2, 5},
-						&qbft.Message{
-							MsgType:    qbft.CommitMsgType,
-							Height:     10,
-							Round:      qbft.FirstRound,
-							Identifier: identifier[:],
-							Data:       testingutils.CommitDataBytes([]byte{1, 2, 3, 4}),
-						}),
+					testingutils.TestingCommitMultiSignerMessage([]*bls.SecretKey{ks.Shares[1], ks.Shares[2], ks.Shares[3]}, []types.OperatorID{1, 2, 5}),
 				},
-				ControllerPostRoot: "7b74be21fcdae2e7ed495882d1a499642c15a7f732f210ee84fb40cc97d1ce96",
+				ControllerPostRoot: "47713c38fe74ce55959980781287886c603c2117a14dc8abce24dcb9be0093af",
 			},
 		},
-		ExpectedError: "invalid decided msg: invalid decided msg: commit msg signature invalid: unknown signer",
+		ExpectedError: "invalid decided msg: invalid decided msg: msg signature invalid: unknown signer",
 	}
 }

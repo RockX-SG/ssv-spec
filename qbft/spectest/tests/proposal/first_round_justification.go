@@ -8,30 +8,19 @@ import (
 )
 
 // FirstRoundJustification tests proposal justification for first round (proposer is correct check)
-func FirstRoundJustification() *tests.MsgProcessingSpecTest {
+func FirstRoundJustification() tests.SpecTest {
 	pre := testingutils.BaseInstance()
+	ks := testingutils.Testing4SharesSet()
 	msgs := []*qbft.SignedMessage{
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.ProposalMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.ProposalDataBytes([]byte{1, 2, 3, 4}, nil, nil),
-		}),
+		testingutils.TestingProposalMessage(ks.Shares[1], types.OperatorID(1)),
 	}
 	return &tests.MsgProcessingSpecTest{
 		Name:          "proposal first round justification",
 		Pre:           pre,
-		PostRoot:      "93f809fcad476369d03647b6a6661ba3313af3e7b3446d9f639513c2c25f53a9",
+		PostRoot:      "ce6d77d0602c7a368a6f86a32d70495b47e6d9fcfd2f5ad0d2952a3f5ac963e7",
 		InputMessages: msgs,
 		OutputMessages: []*qbft.SignedMessage{
-			testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-				MsgType:    qbft.PrepareMsgType,
-				Height:     qbft.FirstHeight,
-				Round:      qbft.FirstRound,
-				Identifier: []byte{1, 2, 3, 4},
-				Data:       testingutils.PrepareDataBytes([]byte{1, 2, 3, 4}),
-			}),
+			testingutils.TestingPrepareMessage(ks.Shares[1], types.OperatorID(1)),
 		},
 		ExpectedTimerState: &testingutils.TimerState{
 			Timeouts: 0,

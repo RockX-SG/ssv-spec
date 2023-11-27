@@ -1,6 +1,10 @@
 package preconsensus
 
 import (
+	"fmt"
+
+	"github.com/attestantio/go-eth2-client/spec"
+
 	"github.com/bloxapp/ssv-spec/qbft"
 	"github.com/bloxapp/ssv-spec/ssv"
 	"github.com/bloxapp/ssv-spec/ssv/spectest/tests"
@@ -9,12 +13,12 @@ import (
 )
 
 // PostDecided tests a msg received post consensus decided (and post receiving a quorum for pre consensus)
-func PostDecided() *tests.MultiMsgProcessingSpecTest {
+func PostDecided() tests.SpecTest {
 	ks := testingutils.Testing4SharesSet()
 
 	// TODO: check errors
 	// nolint
-	decideRunner := func(r ssv.Runner, duty *types.Duty, decidedValue *types.ConsensusData, preMsgs []*ssv.SignedPartialSignatureMessage) ssv.Runner {
+	decideRunner := func(r ssv.Runner, duty *types.Duty, decidedValue *types.ConsensusData, preMsgs []*types.SignedPartialSignatureMessage) ssv.Runner {
 		r.GetBaseRunner().State = ssv.NewRunnerState(3, duty)
 		for _, msg := range preMsgs {
 			r.ProcessPreConsensus(msg)
@@ -31,69 +35,107 @@ func PostDecided() *tests.MultiMsgProcessingSpecTest {
 		return r
 	}
 
-	return &tests.MultiMsgProcessingSpecTest{
+	multiSpecTest := &tests.MultiMsgProcessingSpecTest{
 		Name: "pre consensus post decided",
 		Tests: []*tests.MsgProcessingSpecTest{
 			{
 				Name: "sync committee aggregator selection proof",
 				Runner: decideRunner(
 					testingutils.SyncCommitteeContributionRunner(ks),
-					testingutils.TestingSyncCommitteeContributionDuty,
+					&testingutils.TestingSyncCommitteeContributionDuty,
 					testingutils.TestSyncCommitteeContributionConsensusData,
-					[]*ssv.SignedPartialSignatureMessage{
+					[]*types.SignedPartialSignatureMessage{
 						testingutils.PreConsensusContributionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1),
 						testingutils.PreConsensusContributionProofMsg(ks.Shares[2], ks.Shares[2], 2, 2),
 						testingutils.PreConsensusContributionProofMsg(ks.Shares[3], ks.Shares[3], 3, 3),
 					},
 				),
-				Duty: testingutils.TestingSyncCommitteeContributionDuty,
+				Duty: &testingutils.TestingSyncCommitteeContributionDuty,
 				Messages: []*types.SSVMessage{
 					testingutils.SSVMsgSyncCommitteeContribution(nil, testingutils.PreConsensusContributionProofMsg(ks.Shares[4], ks.Shares[4], 4, 4)),
 				},
-				PostDutyRunnerStateRoot: "5e6fbf39d391d50dce700a00fe05eee9a42be4a134352b63b9c3640529278758",
+				PostDutyRunnerStateRoot: postDecidedSyncCommitteeContributionSC().Root(),
+				PostDutyRunnerState:     postDecidedSyncCommitteeContributionSC().ExpectedState,
 				DontStartDuty:           true,
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
+				OutputMessages:          []*types.SignedPartialSignatureMessage{},
 			},
 			{
 				Name: "aggregator selection proof",
 				Runner: decideRunner(
 					testingutils.AggregatorRunner(ks),
-					testingutils.TestingAggregatorDuty,
+					&testingutils.TestingAggregatorDuty,
 					testingutils.TestAggregatorConsensusData,
-					[]*ssv.SignedPartialSignatureMessage{
+					[]*types.SignedPartialSignatureMessage{
 						testingutils.PreConsensusSelectionProofMsg(ks.Shares[1], ks.Shares[1], 1, 1),
 						testingutils.PreConsensusSelectionProofMsg(ks.Shares[2], ks.Shares[2], 2, 2),
 						testingutils.PreConsensusSelectionProofMsg(ks.Shares[3], ks.Shares[3], 3, 3),
 					},
 				),
-				Duty: testingutils.TestingAggregatorDuty,
+				Duty: &testingutils.TestingAggregatorDuty,
 				Messages: []*types.SSVMessage{
 					testingutils.SSVMsgAggregator(nil, testingutils.PreConsensusSelectionProofMsg(ks.Shares[4], ks.Shares[4], 4, 4)),
 				},
-				PostDutyRunnerStateRoot: "890612faf1dd7600fd2bacc03e2f5bba903e8fb6b859a3b5d6a6afd79ef90284",
+				PostDutyRunnerStateRoot: postDecidedAggregatorSC().Root(),
+				PostDutyRunnerState:     postDecidedAggregatorSC().ExpectedState,
 				DontStartDuty:           true,
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
-			},
-			{
-				Name: "randao",
-				Runner: decideRunner(
-					testingutils.ProposerRunner(ks),
-					testingutils.TestingProposerDuty,
-					testingutils.TestProposerConsensusData,
-					[]*ssv.SignedPartialSignatureMessage{
-						testingutils.PreConsensusRandaoDifferentSignerMsg(ks.Shares[1], ks.Shares[1], 1, 1),
-						testingutils.PreConsensusRandaoDifferentSignerMsg(ks.Shares[2], ks.Shares[2], 2, 2),
-						testingutils.PreConsensusRandaoDifferentSignerMsg(ks.Shares[3], ks.Shares[3], 3, 3),
-					},
-				),
-				Duty: testingutils.TestingProposerDuty,
-				Messages: []*types.SSVMessage{
-					testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsg(ks.Shares[4], ks.Shares[4], 4, 4)),
-				},
-				PostDutyRunnerStateRoot: "26bfdac765c2fa0cda2965fc8002f61c1ab7d2d1bbad7da85f6b6afb0305c8db",
-				DontStartDuty:           true,
-				OutputMessages:          []*ssv.SignedPartialSignatureMessage{},
+				OutputMessages:          []*types.SignedPartialSignatureMessage{},
 			},
 		},
 	}
+
+	// proposerV creates a test specification for versioned proposer.
+	proposerV := func(version spec.DataVersion) *tests.MsgProcessingSpecTest {
+		return &tests.MsgProcessingSpecTest{
+			Name: fmt.Sprintf("randao (%s)", version.String()),
+			Runner: decideRunner(
+				testingutils.ProposerRunner(ks),
+				testingutils.TestingProposerDutyV(version),
+				testingutils.TestProposerConsensusDataV(version),
+				[]*types.SignedPartialSignatureMessage{
+					testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[1], ks.Shares[1], 1, 1, version),
+					testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[2], ks.Shares[2], 2, 2, version),
+					testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[3], ks.Shares[3], 3, 3, version),
+				},
+			),
+			Duty: testingutils.TestingProposerDutyV(version),
+			Messages: []*types.SSVMessage{
+				testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[4], ks.Shares[4], 4, 4, version)),
+			},
+			PostDutyRunnerStateRoot: postDecidedProposerSC(version).Root(),
+			PostDutyRunnerState:     postDecidedProposerSC(version).ExpectedState,
+			DontStartDuty:           true,
+			OutputMessages:          []*types.SignedPartialSignatureMessage{},
+		}
+	}
+
+	// proposerBlindedV creates a test specification for versioned proposer with blinded block.
+	proposerBlindedV := func(version spec.DataVersion) *tests.MsgProcessingSpecTest {
+		return &tests.MsgProcessingSpecTest{
+			Name: fmt.Sprintf("randao blinded block (%s)", version.String()),
+			Runner: decideRunner(
+				testingutils.ProposerBlindedBlockRunner(ks),
+				testingutils.TestingProposerDutyV(version),
+				testingutils.TestProposerBlindedBlockConsensusDataV(version),
+				[]*types.SignedPartialSignatureMessage{
+					testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[1], ks.Shares[1], 1, 1, version),
+					testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[2], ks.Shares[2], 2, 2, version),
+					testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[3], ks.Shares[3], 3, 3, version),
+				},
+			),
+			Duty: testingutils.TestingProposerDutyV(version),
+			Messages: []*types.SSVMessage{
+				testingutils.SSVMsgProposer(nil, testingutils.PreConsensusRandaoDifferentSignerMsgV(ks.Shares[4], ks.Shares[4], 4, 4, version)),
+			},
+			PostDutyRunnerStateRoot: postDecidedBlindedProposerSC(version).Root(),
+			PostDutyRunnerState:     postDecidedBlindedProposerSC(version).ExpectedState,
+			DontStartDuty:           true,
+			OutputMessages:          []*types.SignedPartialSignatureMessage{},
+		}
+	}
+
+	for _, v := range testingutils.SupportedBlockVersions {
+		multiSpecTest.Tests = append(multiSpecTest.Tests, []*tests.MsgProcessingSpecTest{proposerV(v), proposerBlindedV(v)}...)
+	}
+
+	return multiSpecTest
 }

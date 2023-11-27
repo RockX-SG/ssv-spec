@@ -26,11 +26,11 @@ type Runner interface {
 	// HasRunningDuty returns true if it has a running duty
 	HasRunningDuty() bool
 	// ProcessPreConsensus processes all pre-consensus msgs, returns error if can't process
-	ProcessPreConsensus(signedMsg *SignedPartialSignatureMessage) error
+	ProcessPreConsensus(signedMsg *types.SignedPartialSignatureMessage) error
 	// ProcessConsensus processes all consensus msgs, returns error if can't process
 	ProcessConsensus(msg *qbft.SignedMessage) error
 	// ProcessPostConsensus processes all post-consensus msgs, returns error if can't process
-	ProcessPostConsensus(signedMsg *SignedPartialSignatureMessage) error
+	ProcessPostConsensus(signedMsg *types.SignedPartialSignatureMessage) error
 
 	// expectedPreConsensusRootsAndDomain an INTERNAL function, returns the expected pre-consensus roots to sign
 	expectedPreConsensusRootsAndDomain() ([]ssz.HashRoot, spec.DomainType, error)
@@ -46,36 +46,63 @@ type BaseRunner struct {
 	QBFTController *qbft.Controller
 	BeaconNetwork  types.BeaconNetwork
 	BeaconRoleType types.BeaconRole
+
+	// highestDecidedSlot holds the highest decided duty slot and gets updated after each decided is reached
+	highestDecidedSlot spec.Slot
+}
+
+func NewBaseRunner(
+	state *State,
+	share *types.Share,
+	controller *qbft.Controller,
+	beaconNetwork types.BeaconNetwork,
+	beaconRoleType types.BeaconRole,
+	highestDecidedSlot spec.Slot,
+) *BaseRunner {
+	return &BaseRunner{
+		State:              state,
+		Share:              share,
+		QBFTController:     controller,
+		BeaconNetwork:      beaconNetwork,
+		BeaconRoleType:     beaconRoleType,
+		highestDecidedSlot: highestDecidedSlot,
+	}
+}
+
+// SetHighestDecidedSlot set highestDecidedSlot for base runner
+func (b *BaseRunner) SetHighestDecidedSlot(slot spec.Slot) {
+	b.highestDecidedSlot = slot
+}
+
+// setupForNewDuty is sets the runner for a new duty
+func (b *BaseRunner) baseSetupForNewDuty(duty *types.Duty) {
+	// start new state
+	b.State = NewRunnerState(b.Share.Quorum, duty)
 }
 
 // baseStartNewDuty is a base func that all runner implementation can call to start a duty
 func (b *BaseRunner) baseStartNewDuty(runner Runner, duty *types.Duty) error {
-	if err := b.canStartNewDuty(); err != nil {
-		return err
+	if err := b.ShouldProcessDuty(duty); err != nil {
+		return errors.Wrap(err, "can't start duty")
 	}
-	b.State = NewRunnerState(b.Share.Quorum, duty)
+
+	b.baseSetupForNewDuty(duty)
+
 	return runner.executeDuty(duty)
 }
 
-// canStartNewDuty is a base func that all runner implementation can call to decide if a new duty can start
-func (b *BaseRunner) canStartNewDuty() error {
-	if b.State == nil {
-		return nil
+// baseStartNewBeaconDuty is a base func that all runner implementation can call to start a non-beacon duty
+func (b *BaseRunner) baseStartNewNonBeaconDuty(runner Runner, duty *types.Duty) error {
+	if err := b.ShouldProcessNonBeaconDuty(duty); err != nil {
+		return errors.Wrap(err, "can't start non-beacon duty")
 	}
-
-	// check if instance running first as we can't start new duty if it does
-	if b.State.RunningInstance != nil {
-		// check consensus decided
-		if decided, _ := b.State.RunningInstance.IsDecided(); !decided {
-			return errors.New("consensus on duty is running")
-		}
-	}
-	return nil
+	b.baseSetupForNewDuty(duty)
+	return runner.executeDuty(duty)
 }
 
 // basePreConsensusMsgProcessing is a base func that all runner implementation can call for processing a pre-consensus msg
-func (b *BaseRunner) basePreConsensusMsgProcessing(runner Runner, signedMsg *SignedPartialSignatureMessage) (bool, [][]byte, error) {
-	if err := b.validatePreConsensusMsg(runner, signedMsg); err != nil {
+func (b *BaseRunner) basePreConsensusMsgProcessing(runner Runner, signedMsg *types.SignedPartialSignatureMessage) (bool, [][32]byte, error) {
+	if err := b.ValidatePreConsensusMsg(runner, signedMsg); err != nil {
 		return false, nil, errors.Wrap(err, "invalid pre-consensus message")
 	}
 
@@ -90,30 +117,36 @@ func (b *BaseRunner) baseConsensusMsgProcessing(runner Runner, msg *qbft.SignedM
 		prevDecided, _ = b.State.RunningInstance.IsDecided()
 	}
 
+	// TODO: revert `if false` after pre-consensus justification is fixed.
+	if false {
+		if err := b.processPreConsensusJustification(runner, b.highestDecidedSlot, msg); err != nil {
+			return false, nil, errors.Wrap(err, "invalid pre-consensus justification")
+		}
+	}
+
 	decidedMsg, err := b.QBFTController.ProcessMsg(msg)
 	if err != nil {
 		return false, nil, err
 	}
 
 	// we allow all consensus msgs to be processed, once the process finishes we check if there is an actual running duty
+	// do not return error if no running duty
 	if !b.hasRunningDuty() {
-		return false, nil, err
+		return false, nil, nil
 	}
 
 	if decideCorrectly, err := b.didDecideCorrectly(prevDecided, decidedMsg); !decideCorrectly {
 		return false, nil, err
 	}
 
-	// get decided value
-	decidedData, err := decidedMsg.Message.GetCommitData()
-	if err != nil {
-		return false, nil, errors.Wrap(err, "failed to get decided data")
-	}
-
+	// decode consensus data
 	decidedValue = &types.ConsensusData{}
-	if err := decidedValue.Decode(decidedData.Data); err != nil {
+	if err := decidedValue.Decode(decidedMsg.FullData); err != nil {
 		return true, nil, errors.Wrap(err, "failed to parse decided value to ConsensusData")
 	}
+
+	// update the highest decided slot
+	b.highestDecidedSlot = decidedValue.Duty.Slot
 
 	if err := b.validateDecidedConsensusData(runner, decidedValue); err != nil {
 		return true, nil, errors.Wrap(err, "decided ConsensusData invalid")
@@ -125,8 +158,8 @@ func (b *BaseRunner) baseConsensusMsgProcessing(runner Runner, msg *qbft.SignedM
 }
 
 // basePostConsensusMsgProcessing is a base func that all runner implementation can call for processing a post-consensus msg
-func (b *BaseRunner) basePostConsensusMsgProcessing(runner Runner, signedMsg *SignedPartialSignatureMessage) (bool, [][]byte, error) {
-	if err := b.validatePostConsensusMsg(runner, signedMsg); err != nil {
+func (b *BaseRunner) basePostConsensusMsgProcessing(runner Runner, signedMsg *types.SignedPartialSignatureMessage) (bool, [][32]byte, error) {
+	if err := b.ValidatePostConsensusMsg(runner, signedMsg); err != nil {
 		return false, nil, errors.Wrap(err, "invalid post-consensus message")
 	}
 
@@ -136,10 +169,10 @@ func (b *BaseRunner) basePostConsensusMsgProcessing(runner Runner, signedMsg *Si
 
 // basePartialSigMsgProcessing adds an already validated partial msg to the container, checks for quorum and returns true (and roots) if quorum exists
 func (b *BaseRunner) basePartialSigMsgProcessing(
-	signedMsg *SignedPartialSignatureMessage,
+	signedMsg *types.SignedPartialSignatureMessage,
 	container *PartialSigContainer,
-) (bool, [][]byte, error) {
-	roots := make([][]byte, 0)
+) (bool, [][32]byte, error) {
+	roots := make([][32]byte, 0)
 	anyQuorum := false
 	for _, msg := range signedMsg.Message.Messages {
 		prevQuorum := container.HasQuorum(msg.SigningRoot)
@@ -189,7 +222,10 @@ func (b *BaseRunner) decide(runner Runner, input *types.ConsensusData) error {
 		return errors.Wrap(err, "input data invalid")
 	}
 
-	if err := runner.GetBaseRunner().QBFTController.StartNewInstance(byts); err != nil {
+	if err := runner.GetBaseRunner().QBFTController.StartNewInstance(
+		qbft.Height(input.Duty.Slot),
+		byts,
+	); err != nil {
 		return errors.Wrap(err, "could not start new QBFT instance")
 	}
 	newInstance := runner.GetBaseRunner().QBFTController.InstanceForHeight(runner.GetBaseRunner().QBFTController.Height)
@@ -207,4 +243,21 @@ func (b *BaseRunner) hasRunningDuty() bool {
 		return false
 	}
 	return !b.State.Finished
+}
+
+func (b *BaseRunner) ShouldProcessDuty(duty *types.Duty) error {
+	if b.QBFTController.Height >= qbft.Height(duty.Slot) && b.QBFTController.Height != 0 {
+		return errors.Errorf("duty for slot %d already passed. Current height is %d", duty.Slot,
+			b.QBFTController.Height)
+	}
+	return nil
+}
+
+func (b *BaseRunner) ShouldProcessNonBeaconDuty(duty *types.Duty) error {
+	// assume StartingDuty is not nil if state is not nil
+	if b.State != nil && b.State.StartingDuty.Slot >= duty.Slot {
+		return errors.Errorf("duty for slot %d already passed. Current slot is %d", duty.Slot,
+			b.State.StartingDuty.Slot)
+	}
+	return nil
 }
