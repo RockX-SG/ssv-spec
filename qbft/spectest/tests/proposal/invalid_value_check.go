@@ -8,23 +8,21 @@ import (
 )
 
 // InvalidValueCheck tests a proposal that doesn't pass value check
-func InvalidValueCheck() *tests.MsgProcessingSpecTest {
+func InvalidValueCheck() tests.SpecTest {
 	pre := testingutils.BaseInstance()
+	ks := testingutils.Testing4SharesSet()
 	msgs := []*qbft.SignedMessage{
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.ProposalMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      qbft.FirstRound,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.ProposalDataBytes(testingutils.TestingInvalidValueCheck, nil, nil),
-		}),
+		testingutils.TestingProposalMessageWithIdentifierAndFullData(
+			ks.Shares[1], types.OperatorID(1), []byte{1, 2, 3, 4}, testingutils.TestingInvalidValueCheck,
+			qbft.FirstHeight),
 	}
+
 	return &tests.MsgProcessingSpecTest{
 		Name:           "invalid proposal value check",
 		Pre:            pre,
-		PostRoot:       "3e721f04a2a64737ec96192d59e90dfdc93f166ec9a21b88cc33ee0c43f2b26a",
+		PostRoot:       "5b18ca0b470208d8d247543306850618f02bddcbaa7c37eb6d5b36eb3accb5fb",
 		InputMessages:  msgs,
 		OutputMessages: []*qbft.SignedMessage{},
-		ExpectedError:  "proposal invalid: proposal not justified: proposal value invalid: invalid value",
+		ExpectedError:  "invalid signed message: proposal not justified: proposal fullData invalid: invalid value",
 	}
 }

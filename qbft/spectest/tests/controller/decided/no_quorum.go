@@ -9,29 +9,24 @@ import (
 )
 
 // NoQuorum tests decided msg with < unique 2f+1 signers
-func NoQuorum() *tests.ControllerSpecTest {
-	identifier := types.NewMsgID(testingutils.TestingValidatorPubKey[:], types.BNRoleAttester)
+func NoQuorum() tests.SpecTest {
 	ks := testingutils.Testing4SharesSet()
+
 	return &tests.ControllerSpecTest{
 		Name: "decide no quorum",
 		RunInstanceData: []*tests.RunInstanceData{
 			{
 				InputValue: []byte{1, 2, 3, 4},
 				InputMessages: []*qbft.SignedMessage{
-					testingutils.MultiSignQBFTMsg(
+					testingutils.TestingCommitMultiSignerMessageWithHeight(
 						[]*bls.SecretKey{ks.Shares[1], ks.Shares[2]},
 						[]types.OperatorID{1, 2},
-						&qbft.Message{
-							MsgType:    qbft.CommitMsgType,
-							Height:     10,
-							Round:      qbft.FirstRound,
-							Identifier: identifier[:],
-							Data:       testingutils.CommitDataBytes([]byte{1, 2, 3, 4}),
-						}),
+						qbft.FirstHeight,
+					),
 				},
-				ControllerPostRoot: "7b74be21fcdae2e7ed495882d1a499642c15a7f732f210ee84fb40cc97d1ce96",
 			},
 		},
-		ExpectedError: "invalid future msg: allows 1 signer",
+		// TODO: before merge ask engineering how often they see such message in production
+		ExpectedError: "could not process msg: invalid signed message: did not receive proposal for this round",
 	}
 }

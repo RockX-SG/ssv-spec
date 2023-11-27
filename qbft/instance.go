@@ -21,7 +21,9 @@ type Instance struct {
 
 	processMsgF *types.ThreadSafeF
 	startOnce   sync.Once
-	StartValue  []byte
+	// forceStop will force stop the instance if set to true
+	forceStop  bool
+	StartValue []byte
 }
 
 func NewInstance(
@@ -45,6 +47,10 @@ func NewInstance(
 		config:      config,
 		processMsgF: types.NewThreadSafeF(),
 	}
+}
+
+func (i *Instance) ForceStop() {
+	i.forceStop = true
 }
 
 // Start is an interface implementation
@@ -72,6 +78,9 @@ func (i *Instance) Start(value []byte, height Height) {
 }
 
 func (i *Instance) Broadcast(msg *SignedMessage) error {
+	if !i.CanProcessMessages() {
+		return errors.New("instance stopped processing messages")
+	}
 	byts, err := msg.Encode()
 	if err != nil {
 		return errors.Wrap(err, "could not encode message")
@@ -90,7 +99,11 @@ func (i *Instance) Broadcast(msg *SignedMessage) error {
 
 // ProcessMsg processes a new QBFT msg, returns non nil error on msg processing error
 func (i *Instance) ProcessMsg(msg *SignedMessage) (decided bool, decidedValue []byte, aggregatedCommit *SignedMessage, err error) {
-	if err := msg.Validate(); err != nil {
+	if !i.CanProcessMessages() {
+		return false, nil, nil, errors.New("instance stopped processing messages")
+	}
+
+	if err := i.BaseMsgValidation(msg); err != nil {
 		return false, nil, nil, errors.Wrap(err, "invalid signed message")
 	}
 
@@ -119,6 +132,57 @@ func (i *Instance) ProcessMsg(msg *SignedMessage) (decided bool, decidedValue []
 	return i.State.Decided, i.State.DecidedValue, aggregatedCommit, nil
 }
 
+func (i *Instance) BaseMsgValidation(msg *SignedMessage) error {
+	if err := msg.Validate(); err != nil {
+		return errors.Wrap(err, "invalid signed message")
+	}
+
+	if msg.Message.Round < i.State.Round {
+		return errors.New("past round")
+	}
+
+	switch msg.Message.MsgType {
+	case ProposalMsgType:
+		return isValidProposal(
+			i.State,
+			i.config,
+			msg,
+			i.config.GetValueCheckF(),
+			i.State.Share.Committee,
+		)
+	case PrepareMsgType:
+		proposedMsg := i.State.ProposalAcceptedForCurrentRound
+		if proposedMsg == nil {
+			return errors.New("did not receive proposal for this round")
+		}
+		return validSignedPrepareForHeightRoundAndRoot(
+			i.config,
+			msg,
+			i.State.Height,
+			i.State.Round,
+			proposedMsg.Message.Root,
+			i.State.Share.Committee,
+		)
+	case CommitMsgType:
+		proposedMsg := i.State.ProposalAcceptedForCurrentRound
+		if proposedMsg == nil {
+			return errors.New("did not receive proposal for this round")
+		}
+		return validateCommit(
+			i.config,
+			msg,
+			i.State.Height,
+			i.State.Round,
+			i.State.ProposalAcceptedForCurrentRound,
+			i.State.Share.Committee,
+		)
+	case RoundChangeMsgType:
+		return validRoundChangeForData(i.State, i.config, msg, i.State.Height, msg.Message.Round, msg.FullData)
+	default:
+		return errors.New("signed message type not supported")
+	}
+}
+
 // IsDecided interface implementation
 func (i *Instance) IsDecided() (bool, []byte) {
 	if state := i.State; state != nil {
@@ -138,7 +202,7 @@ func (i *Instance) GetHeight() Height {
 }
 
 // GetRoot returns the state's deterministic root
-func (i *Instance) GetRoot() ([]byte, error) {
+func (i *Instance) GetRoot() ([32]byte, error) {
 	return i.State.GetRoot()
 }
 
@@ -150,4 +214,9 @@ func (i *Instance) Encode() ([]byte, error) {
 // Decode implementation
 func (i *Instance) Decode(data []byte) error {
 	return json.Unmarshal(data, &i)
+}
+
+// CanProcessMessages will return true if instance can process messages
+func (i *Instance) CanProcessMessages() bool {
+	return !i.forceStop && int(i.State.Round) < CutoffRound
 }

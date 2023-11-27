@@ -6,7 +6,6 @@ import (
 	"crypto/rsa"
 	"encoding/hex"
 
-	"github.com/attestantio/go-eth2-client/spec/bellatrix"
 	spec "github.com/attestantio/go-eth2-client/spec/phase0"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/ethereum/go-ethereum/common"
@@ -33,7 +32,7 @@ func NewTestingKeyManagerWithSlashableRoots(slashableDataRoots [][]byte) *testin
 		keys:           map[string]*bls.SecretKey{},
 		ecdsaKeys:      map[string]*ecdsa.PrivateKey{},
 		encryptionKeys: nil,
-		domain:         types.PrimusTestnet,
+		domain:         TestingSSVDomainType,
 
 		slashableDataRoots: slashableDataRoots,
 	}
@@ -73,7 +72,7 @@ func NewTestingKeyManagerWithSlashableRoots(slashableDataRoots [][]byte) *testin
 }
 
 // IsAttestationSlashable returns error if attestation is slashable
-func (km *testingKeyManager) IsAttestationSlashable(data *spec.AttestationData) error {
+func (km *testingKeyManager) IsAttestationSlashable(pk []byte, data *spec.AttestationData) error {
 	for _, r := range km.slashableDataRoots {
 		r2, _ := data.HashTreeRoot()
 		if bytes.Equal(r, r2[:]) {
@@ -90,40 +89,30 @@ func (km *testingKeyManager) SignRoot(data types.Root, sigType types.SignatureTy
 			return nil, errors.Wrap(err, "could not sign root")
 		}
 
-		return k.SignByte(computedRoot).Serialize(), nil
+		return k.SignByte(computedRoot[:]).Serialize(), nil
 	}
 	return nil, errors.New("pk not found")
 }
 
-// IsBeaconBlockSlashable returns true if the given block is slashable
-func (km *testingKeyManager) IsBeaconBlockSlashable(block *bellatrix.BeaconBlock) error {
+// IsBeaconBlockSlashable returns error if the given block is slashable
+func (km *testingKeyManager) IsBeaconBlockSlashable(pk []byte, slot spec.Slot) error {
 	return nil
 }
 
-func (km *testingKeyManager) SignBeaconObject(obj ssz.HashRoot, domain spec.Domain, pk []byte) (types.Signature, []byte, error) {
+func (km *testingKeyManager) SignBeaconObject(obj ssz.HashRoot, domain spec.Domain, pk []byte, domainType spec.DomainType) (types.Signature, [32]byte, error) {
 	if k, found := km.keys[hex.EncodeToString(pk)]; found {
 		r, err := types.ComputeETHSigningRoot(obj, domain)
 		if err != nil {
-			return nil, nil, errors.Wrap(err, "could not compute signing root")
+			return nil, [32]byte{}, errors.Wrap(err, "could not compute signing root")
 		}
 
 		sig := k.SignByte(r[:])
 		blsSig := spec.BLSSignature{}
 		copy(blsSig[:], sig.Serialize())
 
-		return sig.Serialize(), r[:], nil
+		return sig.Serialize(), r, nil
 	}
-	return nil, nil, errors.New("pk not found")
-}
-
-// Decrypt given a rsa privkey and a PKCS1v15 cipher text byte array, returns the decrypted data
-func (km *testingKeyManager) Decrypt(sk *rsa.PrivateKey, cipher []byte) ([]byte, error) {
-	return TestingDecryption(sk, cipher), nil
-}
-
-// Encrypt given a rsa pubkey and data returns an PKCS1v15 e
-func (km *testingKeyManager) Encrypt(pk *rsa.PublicKey, data []byte) ([]byte, error) {
-	return TestingEncryption(pk, data), nil
+	return nil, [32]byte{}, errors.New("pk not found")
 }
 
 // SignDKGOutput signs output according to the SIP https://docs.google.com/document/d/1TRVUHjFyxINWW2H9FYLNL2pQoLy6gmvaI62KL_4cREQ/edit
@@ -132,11 +121,11 @@ func (km *testingKeyManager) SignDKGOutput(output types.Root, sk *rsa.PrivateKey
 	if err != nil {
 		return nil, err
 	}
-	return types.Sign(sk, root)
+	return types.Sign(sk, root[:])
 }
 
 func (km *testingKeyManager) SignETHDepositRoot(root []byte, address common.Address) (types.Signature, error) {
-	panic("implemet")
+	panic("implement")
 }
 
 func (km *testingKeyManager) AddShare(shareKey *bls.SecretKey) error {

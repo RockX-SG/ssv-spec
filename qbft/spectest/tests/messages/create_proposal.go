@@ -5,11 +5,11 @@ import (
 )
 
 // CreateProposal tests creating a proposal msg, not previously prepared
-func CreateProposal() *tests.CreateMsgSpecTest {
+func CreateProposal() tests.SpecTest {
 	return &tests.CreateMsgSpecTest{
 		CreateType:   tests.CreateProposal,
 		Name:         "create proposal",
-		Value:        []byte{1, 2, 3, 4},
-		ExpectedRoot: "7aff149aa49b4dd364e108a0abbf78eae78772eff2ddaed2f2a61bca771077fd",
+		Value:        [32]byte{1, 2, 3, 4},
+		ExpectedRoot: "dfb0a692281b916b1d037df44f5c742f13ac3ee207ea0082cc3ca2afff34e178",
 	}
 }

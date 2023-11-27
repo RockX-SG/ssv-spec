@@ -5,42 +5,48 @@ import (
 	"github.com/bloxapp/ssv-spec/qbft/spectest/tests"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
+	"github.com/bloxapp/ssv-spec/types/testingutils/comparable"
 )
 
 // F1DifferentFutureRoundsNotPrepared tests f+1 speedup (not prev prepared)
-func F1DifferentFutureRoundsNotPrepared() *tests.MsgProcessingSpecTest {
+func F1DifferentFutureRoundsNotPrepared() tests.SpecTest {
 	pre := testingutils.BaseInstance()
+	ks := testingutils.Testing4SharesSet()
+	sc := f1DifferentFutureRoundsNotPreparedStateComparison()
 
 	msgs := []*qbft.SignedMessage{
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-			MsgType:    qbft.RoundChangeMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      5,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.RoundChangeDataBytes(nil, qbft.NoRound),
-		}),
-		testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[2], types.OperatorID(2), &qbft.Message{
-			MsgType:    qbft.RoundChangeMsgType,
-			Height:     qbft.FirstHeight,
-			Round:      10,
-			Identifier: []byte{1, 2, 3, 4},
-			Data:       testingutils.RoundChangeDataBytes(nil, qbft.NoRound),
-		}),
+		testingutils.TestingRoundChangeMessageWithRound(ks.Shares[1], types.OperatorID(1), 5),
+		testingutils.TestingRoundChangeMessageWithRound(ks.Shares[2], types.OperatorID(2), 10),
 	}
 
 	return &tests.MsgProcessingSpecTest{
 		Name:          "round change f+1 not prepared",
 		Pre:           pre,
-		PostRoot:      "a5e0b34626a0e85cf4494c1ca3b89b7ad5469dff321b05f476955ca2ab173770",
+		PostRoot:      sc.Root(),
+		PostState:     sc.ExpectedState,
 		InputMessages: msgs,
 		OutputMessages: []*qbft.SignedMessage{
-			testingutils.SignQBFTMsg(testingutils.Testing4SharesSet().Shares[1], types.OperatorID(1), &qbft.Message{
-				MsgType:    qbft.RoundChangeMsgType,
-				Height:     qbft.FirstHeight,
-				Round:      5,
-				Identifier: []byte{1, 2, 3, 4},
-				Data:       testingutils.RoundChangeDataBytes(nil, qbft.NoRound),
-			}),
+			testingutils.TestingRoundChangeMessageWithParams(ks.Shares[1], types.OperatorID(1), 5, qbft.FirstHeight,
+				[32]byte{}, 0, [][]byte{}),
 		},
 	}
+}
+
+func f1DifferentFutureRoundsNotPreparedStateComparison() *comparable.StateComparison {
+	ks := testingutils.Testing4SharesSet()
+
+	msgs := []*qbft.SignedMessage{
+		testingutils.TestingRoundChangeMessageWithRound(ks.Shares[1], types.OperatorID(1), 5),
+		testingutils.TestingRoundChangeMessageWithRound(ks.Shares[2], types.OperatorID(2), 10),
+	}
+
+	instance := &qbft.Instance{
+		State: &qbft.State{
+			Share: testingutils.TestingShare(testingutils.Testing4SharesSet()),
+			ID:    testingutils.TestingIdentifier,
+			Round: 5,
+		},
+	}
+	comparable.SetSignedMessages(instance, msgs)
+	return &comparable.StateComparison{ExpectedState: instance.State}
 }

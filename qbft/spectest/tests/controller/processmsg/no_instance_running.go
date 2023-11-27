@@ -9,8 +9,7 @@ import (
 )
 
 // NoInstanceRunning tests a process msg for height in which there is no running instance
-func NoInstanceRunning() *tests.ControllerSpecTest {
-	identifier := types.NewMsgID(testingutils.TestingValidatorPubKey[:], types.BNRoleAttester)
+func NoInstanceRunning() tests.SpecTest {
 	ks := testingutils.Testing4SharesSet()
 	return &tests.ControllerSpecTest{
 		Name: "no instance running",
@@ -18,32 +17,19 @@ func NoInstanceRunning() *tests.ControllerSpecTest {
 			{
 				InputValue: []byte{1, 2, 3, 4},
 				InputMessages: []*qbft.SignedMessage{
-					testingutils.MultiSignQBFTMsg(
+					testingutils.TestingCommitMultiSignerMessageWithHeight(
 						[]*bls.SecretKey{ks.Shares[1], ks.Shares[2], ks.Shares[3]},
 						[]types.OperatorID{1, 2, 3},
-						&qbft.Message{
-							MsgType:    qbft.CommitMsgType,
-							Height:     50,
-							Round:      qbft.FirstRound,
-							Identifier: identifier[:],
-							Data:       testingutils.CommitDataBytes([]byte{1, 2, 3, 4}),
-						}),
-					testingutils.SignQBFTMsg(ks.Shares[1], 1, &qbft.Message{
-						MsgType:    qbft.ProposalMsgType,
-						Height:     2,
-						Round:      qbft.FirstRound,
-						Identifier: identifier[:],
-						Data:       testingutils.ProposalDataBytes([]byte{1, 2, 3, 4}, nil, nil),
-					}),
+						50,
+					),
+					testingutils.TestingProposalMessageWithHeight(ks.Shares[1], 1, 2),
 				},
 
 				ExpectedDecidedState: tests.DecidedState{
-					DecidedVal:               []byte{1, 2, 3, 4},
-					DecidedCnt:               1,
-					CalledSyncDecidedByRange: true,
-					DecidedByRangeValues:     [2]qbft.Height{0, 50},
+					DecidedVal: testingutils.TestingQBFTFullData,
+					DecidedCnt: 1,
 				},
-				ControllerPostRoot: "e80301d8150da48514ea573693b0f5aaf07e4e26727c66068ddfa208ad58722d",
+				ControllerPostRoot: "e8da00ea07e1e5098026373c51e38a681215e12ca4bdeb1f1efbb9d4f3325a92",
 			},
 		},
 		ExpectedError: "instance not found",

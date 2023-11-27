@@ -11,7 +11,7 @@ type MsgSpecTest struct {
 	Name            string
 	Messages        []*qbft.SignedMessage
 	EncodedMessages [][]byte
-	ExpectedRoots   [][]byte
+	ExpectedRoots   [][32]byte
 	ExpectedError   string
 }
 
@@ -22,41 +22,6 @@ func (test *MsgSpecTest) Run(t *testing.T) {
 		if err := msg.Validate(); err != nil {
 			lastErr = err
 			continue
-		}
-
-		switch msg.Message.MsgType {
-		case qbft.RoundChangeMsgType:
-			rc := qbft.RoundChangeData{}
-			if err := rc.Decode(msg.Message.Data); err != nil {
-				lastErr = err
-			}
-			if err := rc.Validate(); err != nil {
-				lastErr = err
-			}
-		case qbft.CommitMsgType:
-			rc := qbft.CommitData{}
-			if err := rc.Decode(msg.Message.Data); err != nil {
-				lastErr = err
-			}
-			if err := rc.Validate(); err != nil {
-				lastErr = err
-			}
-		case qbft.PrepareMsgType:
-			rc := qbft.PrepareData{}
-			if err := rc.Decode(msg.Message.Data); err != nil {
-				lastErr = err
-			}
-			if err := rc.Validate(); err != nil {
-				lastErr = err
-			}
-		case qbft.ProposalMsgType:
-			rc := qbft.ProposalData{}
-			if err := rc.Decode(msg.Message.Data); err != nil {
-				lastErr = err
-			}
-			if err := rc.Validate(); err != nil {
-				lastErr = err
-			}
 		}
 
 		if len(test.EncodedMessages) > 0 {
@@ -82,4 +47,8 @@ func (test *MsgSpecTest) Run(t *testing.T) {
 
 func (test *MsgSpecTest) TestName() string {
 	return "qbft message " + test.Name
+}
+
+func (test *MsgSpecTest) GetPostState() (interface{}, error) {
+	return nil, nil
 }

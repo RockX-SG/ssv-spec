@@ -1,10 +1,12 @@
 package dkg
 
 import (
+	"crypto/sha256"
+	"encoding/json"
+
 	"github.com/bloxapp/ssv-spec/types"
-	"github.com/ethereum/go-ethereum/accounts/abi"
-	"github.com/ethereum/go-ethereum/crypto"
 	"github.com/herumi/bls-eth-go-binary/bls"
+	"github.com/pkg/errors"
 )
 
 type ProtocolOutcome struct {
@@ -50,24 +52,20 @@ type KeySignOutput struct {
 	ValidatorPK types.ValidatorPK
 }
 
-func (o *KeySignOutput) GetRoot() ([]byte, error) {
-	bytesSolidity, _ := abi.NewType("bytes", "", nil)
-	arguments := abi.Arguments{
-		{
-			Type: bytesSolidity,
-		},
-		{
-			Type: bytesSolidity,
-		},
-	}
-	bytes, err := arguments.Pack(
-		[]byte(o.ValidatorPK),
-		[]byte(o.Signature),
-	)
+func (o *KeySignOutput) Encode() ([]byte, error) {
+	return json.Marshal(o)
+}
+
+func (o *KeySignOutput) Decode(data []byte) error {
+	return json.Unmarshal(data, o)
+}
+
+func (o *KeySignOutput) GetRoot() ([32]byte, error) {
+	marshaledRoot, err := o.Encode()
 	if err != nil {
-		return nil, err
+		return [32]byte{}, errors.Wrap(err, "could not encode Message")
 	}
-	return crypto.Keccak256(bytes), nil
+	return sha256.Sum256(marshaledRoot), nil
 }
 
 // BlameOutput is the output of blame round

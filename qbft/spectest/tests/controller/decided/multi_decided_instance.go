@@ -9,26 +9,18 @@ import (
 )
 
 // MultiDecidedInstances tests deciding multiple instances
-func MultiDecidedInstances() *tests.ControllerSpecTest {
-	identifier := types.NewMsgID(testingutils.TestingValidatorPubKey[:], types.BNRoleAttester)
+func MultiDecidedInstances() tests.SpecTest {
+	ks := testingutils.Testing4SharesSet()
+
 	instanceData := func(height qbft.Height, postRoot string) *tests.RunInstanceData {
 		return &tests.RunInstanceData{
 			InputValue: []byte{1, 2, 3, 4},
 			InputMessages: []*qbft.SignedMessage{
-				testingutils.MultiSignQBFTMsg(
-					[]*bls.SecretKey{testingutils.Testing4SharesSet().Shares[1], testingutils.Testing4SharesSet().Shares[2], testingutils.Testing4SharesSet().Shares[3]},
-					[]types.OperatorID{1, 2, 3},
-					&qbft.Message{
-						MsgType:    qbft.CommitMsgType,
-						Height:     height,
-						Round:      qbft.FirstRound,
-						Identifier: identifier[:],
-						Data:       testingutils.CommitDataBytes([]byte{1, 2, 3, 4}),
-					}),
+				testingutils.TestingCommitMultiSignerMessageWithHeight([]*bls.SecretKey{ks.Shares[1], ks.Shares[2], ks.Shares[3]}, []types.OperatorID{1, 2, 3}, height),
 			},
 			ExpectedDecidedState: tests.DecidedState{
 				DecidedCnt: 1,
-				DecidedVal: []byte{1, 2, 3, 4},
+				DecidedVal: testingutils.TestingQBFTFullData,
 			},
 			ControllerPostRoot: postRoot,
 		}
@@ -37,17 +29,17 @@ func MultiDecidedInstances() *tests.ControllerSpecTest {
 	return &tests.ControllerSpecTest{
 		Name: "multi decide instances",
 		RunInstanceData: []*tests.RunInstanceData{
-			instanceData(qbft.FirstHeight, "73ba8a44f10c67c1885385c76076fea5b57c2561c0d506f6d15ec62414f38591"),
-			instanceData(1, "d233358de3510f6236f9441d8cf14a97b5e3b7ce5bdf410090ef660d74a7583a"),
-			instanceData(2, "0ca69a226ad6acd5f2867172b00e5f69b1935c7986e2f3981137b255ce44e8dd"),
-			instanceData(3, "9da8c7102a4b7d66df477d8dbd22b2665eb2891fafc1482c67d491dfe7406120"),
-			instanceData(4, "c75b8981c604389e191c4b36a6db6537b1becba91a65df1e4af1a237475fb7f3"),
-			instanceData(5, "ca0d84be5214cb15e871edd3885ba03153b3420ffabc13babf9a61b6af0989aa"),
-			instanceData(6, "f8dac0bc1ce17dd65faed261553fb8a30ab78e630807dfc2696ec85088b8df0a"),
-			instanceData(7, "60d538a3b3b03cf2b9e1a69bd8a9ea0fa4f05f04cbb97973ab2e2b9936d8425d"),
-			instanceData(8, "af2aaccb6fcdb47197c1c8d1ce202ae44fa6787bae12f55d677e7722152ac193"),
-			instanceData(9, "ab9ce6f1aa909f6c1efaa3859604b13aea6b699674226363fd99767d39518bed"),
-			instanceData(10, "7cd71f9ecb9e2d63f1128a16a2c4a65d9c4979717b63cd4021a0fbde6476e810"),
+			instanceData(qbft.FirstHeight, "f552f5aedb2e0d7933e77c4297c69e761000e88f78ae02e0afd4d053847b8d5c"),
+			instanceData(1, "d0e04e5bce1d0e75def07c8b1917981b86fa25e0d488b5ed365be477ee6a6298"),
+			instanceData(2, "248ad9f2454d5db1f7060c9755374e4ceab8fdb51c1030f3dc6d1b9492155c85"),
+			instanceData(3, "de6d0efcb3e55e1e33e850acf87933b71fa93f2e7f541b6e3bf139d2dd9740eb"),
+			instanceData(4, "7f595bfb4a7e5d6a1cfdd2fed35a55ed57d23de63bbf3fd94f9392829600e0c3"),
+			instanceData(5, "f9d585fd5629b1e619704c66eb2f4b5bb248504d504f830cb63adcad37bcf46e"),
+			instanceData(6, "53e58c1a850e79e9a21d11d39a68ed86a89f5fe84a625d5c6f29064b70838d0a"),
+			instanceData(7, "1bd069bcea9ee80e4b39603d636346e72dd32b599f7e14eaf846a7fc1e438b39"),
+			instanceData(8, "7a7b12431f8880f3f09b7a40f2d88928596e1b692a505813483450e5c637a7dd"),
+			instanceData(9, "0cdc302065fe16d722a3a1db04c07edb8139f7c53aafb847e1aeb89797eb4282"),
+			instanceData(10, "d1383c9a269c18df528f41f2563322a0b3bf490b4625f7fdc9277aca53dacc03"),
 		},
 	}
 }

@@ -49,7 +49,7 @@ var SignDKGMsg = func(sk *rsa.PrivateKey, id types.OperatorID, msg *dkg.Message)
 	sigType := types.DKGSignatureType
 
 	r, _ := types.ComputeSigningRoot(msg, types.ComputeSignatureDomain(domain, sigType))
-	sig, _ := types.Sign(sk, r)
+	sig, _ := types.Sign(sk, r[:])
 
 	return &dkg.SignedMessage{
 		Message:   msg,
@@ -176,7 +176,7 @@ func (ks *TestKeySet) SignedOutputObject(requestID dkg.RequestID, opId types.Ope
 	// root1, _ := o.GetRoot()
 	root1, _ := types.ComputeSigningRoot(o, types.ComputeSignatureDomain(types.PrimusTestnet, types.DKGSignatureType))
 
-	sig, _ := types.Sign(ks.DKGOperators[opId].EncryptionKey, root1)
+	sig, _ := types.Sign(ks.DKGOperators[opId].EncryptionKey, root1[:])
 	// sig, _ := crypto.Sign(root1, ks.DKGOperators[opId].SK)
 
 	ret := &dkg.SignedOutput{
@@ -208,7 +208,7 @@ func (ks *TestKeySet) SignedKeySignOutputObject(requestID dkg.RequestID, opID ty
 	}
 
 	root, _ := types.ComputeSigningRoot(o, types.ComputeSignatureDomain(types.PrimusTestnet, types.DKGSignatureType))
-	sig, _ := types.Sign(ks.DKGOperators[opID].EncryptionKey, root)
+	sig, _ := types.Sign(ks.DKGOperators[opID].EncryptionKey, root[:])
 
 	ret := &dkg.SignedOutput{
 		KeySignData: o,

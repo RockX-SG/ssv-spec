@@ -5,27 +5,38 @@ import (
 	"github.com/bloxapp/ssv-spec/qbft/spectest/tests"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
+	"github.com/herumi/bls-eth-go-binary/bls"
 )
 
-// PreviousDecided tests starting an instance when the previous one decided
-func PreviousDecided() *tests.ControllerSpecTest {
-	identifier := types.NewMsgID(testingutils.TestingValidatorPubKey[:], types.BNRoleAttester)
+// PostFutureDecided tests starting a new instance after deciding with future decided msg
+func PostFutureDecided() tests.SpecTest {
+	ks := testingutils.Testing4SharesSet()
 	return &tests.ControllerSpecTest{
-		Name: "start instance prev decided",
+		Name: "start instance post future decided",
 		RunInstanceData: []*tests.RunInstanceData{
 			{
-				InputValue:    []byte{1, 2, 3, 4},
-				InputMessages: testingutils.DecidingMsgsForHeight([]byte{1, 2, 3, 4}, identifier[:], qbft.FirstHeight, testingutils.Testing4SharesSet()),
+				InputValue: []byte{1, 2, 3, 4},
+				InputMessages: []*qbft.SignedMessage{
+					testingutils.TestingCommitMultiSignerMessageWithHeight(
+						[]*bls.SecretKey{ks.Shares[1], ks.Shares[2], ks.Shares[3]}, []types.OperatorID{1, 2, 3}, 10,
+					),
+				},
 				ExpectedDecidedState: tests.DecidedState{
-					DecidedVal: []byte{1, 2, 3, 4},
+					DecidedVal: testingutils.TestingQBFTFullData,
 					DecidedCnt: 1,
 				},
-				ControllerPostRoot: "0370be5066cbbf1efead61d9b182309afd989b3b720163f7029cbad79537eb4b",
+				ControllerPostRoot: "589b0c0352f1c22875246f2e66530d5fda62f646434b250ade128c61c16f47bd",
 			},
 			{
-				InputValue:         []byte{1, 2, 3, 4},
-				ControllerPostRoot: "0e0db8b36601bef53328c1f1e94e4c3faa02084c743cce138dc2edcce2e5d79e",
+				InputValue: []byte{1, 2, 3, 4},
+				ExpectedDecidedState: tests.DecidedState{
+					DecidedVal: testingutils.TestingQBFTFullData,
+					DecidedCnt: 0,
+				},
+
+				ControllerPostRoot: "589b0c0352f1c22875246f2e66530d5fda62f646434b250ade128c61c16f47bd",
 			},
 		},
+		ExpectedError: "attempting to start an instance with a past height",
 	}
 }

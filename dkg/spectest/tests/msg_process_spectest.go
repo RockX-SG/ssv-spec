@@ -114,7 +114,7 @@ func (test *MsgProcessingSpecTest) Run(t *testing.T) {
 			s := streamed[id]
 			require.NotNilf(t, s, "output for operator %d not found", id)
 
-			var r1, r2 []byte
+			var r1, r2 [32]byte
 			if output.KeySignData != nil && s.KeySignData != nil {
 				r1, _ = output.KeySignData.GetRoot()
 				r2, _ = s.KeySignData.GetRoot()

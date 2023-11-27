@@ -3,28 +3,35 @@ package tests
 import (
 	"bytes"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"reflect"
+	"testing"
+
+	"github.com/stretchr/testify/require"
+
 	"github.com/bloxapp/ssv-spec/qbft"
 	"github.com/bloxapp/ssv-spec/types"
 	"github.com/bloxapp/ssv-spec/types/testingutils"
-	"github.com/stretchr/testify/require"
-	"reflect"
-	"testing"
+	typescomparable "github.com/bloxapp/ssv-spec/types/testingutils/comparable"
 )
 
 type DecidedState struct {
-	DecidedVal               []byte
-	DecidedCnt               uint
-	BroadcastedDecided       *qbft.SignedMessage
-	CalledSyncDecidedByRange bool
-	DecidedByRangeValues     [2]qbft.Height
+	DecidedVal         []byte
+	DecidedCnt         uint
+	BroadcastedDecided *qbft.SignedMessage
 }
 
 type RunInstanceData struct {
 	InputValue           []byte
 	InputMessages        []*qbft.SignedMessage
 	ControllerPostRoot   string
+	ControllerPostState  types.Root `json:"-"` // Field is ignored by encoding/json
 	ExpectedTimerState   *testingutils.TimerState
 	ExpectedDecidedState DecidedState
+	Height               *qbft.Height `json:"omitempty"`
 }
 
 type ControllerSpecTest struct {
@@ -39,17 +46,18 @@ func (test *ControllerSpecTest) TestName() string {
 }
 
 func (test *ControllerSpecTest) Run(t *testing.T) {
-	identifier := types.NewMsgID(testingutils.TestingValidatorPubKey[:], types.BNRoleAttester)
-	config := testingutils.TestingConfig(testingutils.Testing4SharesSet())
-	contr := testingutils.NewTestingQBFTController(
-		identifier[:],
-		testingutils.TestingShare(testingutils.Testing4SharesSet()),
-		config,
-	)
+	//temporary to override state comparisons from file not inputted one
+	test.overrideStateComparison(t)
+
+	contr := test.generateController()
 
 	var lastErr error
-	for _, runData := range test.RunInstanceData {
-		if err := test.runInstanceWithData(t, contr, config, identifier, runData); err != nil {
+	for i, runData := range test.RunInstanceData {
+		height := qbft.Height(i)
+		if runData.Height != nil {
+			height = *runData.Height
+		}
+		if err := test.runInstanceWithData(t, height, contr, runData); err != nil {
 			lastErr = err
 		}
 	}
@@ -61,9 +69,19 @@ func (test *ControllerSpecTest) Run(t *testing.T) {
 	}
 }
 
+func (test *ControllerSpecTest) generateController() *qbft.Controller {
+	identifier := []byte{1, 2, 3, 4}
+	config := testingutils.TestingConfig(testingutils.Testing4SharesSet())
+	return testingutils.NewTestingQBFTController(
+		identifier[:],
+		testingutils.TestingShare(testingutils.Testing4SharesSet()),
+		config,
+	)
+}
+
 func (test *ControllerSpecTest) testTimer(
 	t *testing.T,
-	config *qbft.Config,
+	config qbft.IConfig,
 	runData *RunInstanceData,
 ) {
 	if runData.ExpectedTimerState != nil {
@@ -77,7 +95,7 @@ func (test *ControllerSpecTest) testTimer(
 func (test *ControllerSpecTest) testProcessMsg(
 	t *testing.T,
 	contr *qbft.Controller,
-	config *qbft.Config,
+	config qbft.IConfig,
 	runData *RunInstanceData,
 ) error {
 	decidedCnt := 0
@@ -90,26 +108,18 @@ func (test *ControllerSpecTest) testProcessMsg(
 		if decided != nil {
 			decidedCnt++
 
-			data, _ := decided.Message.GetCommitData()
-			require.EqualValues(t, runData.ExpectedDecidedState.DecidedVal, data.Data)
+			require.EqualValues(t, runData.ExpectedDecidedState.DecidedVal, decided.FullData)
 		}
 	}
 	require.EqualValues(t, runData.ExpectedDecidedState.DecidedCnt, decidedCnt)
-
-	// verify sync decided by range calls
-	if runData.ExpectedDecidedState.CalledSyncDecidedByRange {
-		require.EqualValues(t, runData.ExpectedDecidedState.DecidedByRangeValues, config.GetNetwork().(*testingutils.TestingNetwork).DecidedByRange)
-	} else {
-		require.EqualValues(t, [2]qbft.Height{0, 0}, config.GetNetwork().(*testingutils.TestingNetwork).DecidedByRange)
-	}
 
 	return lastErr
 }
 
 func (test *ControllerSpecTest) testBroadcastedDecided(
 	t *testing.T,
-	config *qbft.Config,
-	identifier types.MessageID,
+	config qbft.IConfig,
+	identifier []byte,
 	runData *RunInstanceData,
 ) {
 	if runData.ExpectedDecidedState.BroadcastedDecided != nil {
@@ -118,7 +128,12 @@ func (test *ControllerSpecTest) testBroadcastedDecided(
 		require.Greater(t, len(broadcastedMsgs), 0)
 		found := false
 		for _, msg := range broadcastedMsgs {
-			if !bytes.Equal(identifier[:], msg.MsgID[:]) {
+
+			// a hack for testing non standard messageID identifiers since we copy them into a MessageID this fixes it
+			msgID := types.MessageID{}
+			copy(msgID[:], identifier)
+
+			if !bytes.Equal(msgID[:], msg.MsgID[:]) {
 				continue
 			}
 
@@ -130,7 +145,7 @@ func (test *ControllerSpecTest) testBroadcastedDecided(
 			r2, err := runData.ExpectedDecidedState.BroadcastedDecided.GetRoot()
 			require.NoError(t, err)
 
-			if bytes.Equal(r1, r2) &&
+			if r1 == r2 &&
 				reflect.DeepEqual(runData.ExpectedDecidedState.BroadcastedDecided.Signers, msg1.Signers) &&
 				reflect.DeepEqual(runData.ExpectedDecidedState.BroadcastedDecided.Signature, msg1.Signature) {
 				require.False(t, found)
@@ -143,29 +158,87 @@ func (test *ControllerSpecTest) testBroadcastedDecided(
 
 func (test *ControllerSpecTest) runInstanceWithData(
 	t *testing.T,
+	height qbft.Height,
 	contr *qbft.Controller,
-	config *qbft.Config,
-	identifier types.MessageID,
 	runData *RunInstanceData,
 ) error {
-	err := contr.StartNewInstance(runData.InputValue)
+	err := contr.StartNewInstance(height, runData.InputValue)
 	var lastErr error
 	if err != nil {
 		lastErr = err
 	}
 
-	test.testTimer(t, config, runData)
+	test.testTimer(t, contr.GetConfig(), runData)
 
-	if err := test.testProcessMsg(t, contr, config, runData); err != nil {
+	if err := test.testProcessMsg(t, contr, contr.GetConfig(), runData); err != nil {
 		lastErr = err
 	}
 
-	test.testBroadcastedDecided(t, config, identifier, runData)
+	test.testBroadcastedDecided(t, contr.GetConfig(), contr.Identifier, runData)
 
 	// test root
 	r, err := contr.GetRoot()
 	require.NoError(t, err)
-	require.EqualValues(t, runData.ControllerPostRoot, hex.EncodeToString(r))
+	if runData.ControllerPostRoot != hex.EncodeToString(r[:]) {
+		diff := typescomparable.PrintDiff(contr, runData.ControllerPostState)
+		require.Fail(t, fmt.Sprintf("post state not equal\nexpected: %s\nreceived: %s", runData.ControllerPostRoot, hex.EncodeToString(r[:])), diff)
+	}
 
 	return lastErr
+}
+
+func (test *ControllerSpecTest) overrideStateComparison(t *testing.T) {
+	basedir, err := os.Getwd()
+	require.NoError(t, err)
+	basedir = filepath.Join(basedir, "generate")
+	dir := typescomparable.GetSCDir(basedir, reflect.TypeOf(test).String())
+	path := filepath.Join(dir, fmt.Sprintf("%s.json", test.TestName()))
+	byteValue, err := os.ReadFile(path)
+	require.NoError(t, err)
+	sc := make([]*qbft.Controller, len(test.RunInstanceData))
+	require.NoError(t, json.Unmarshal(byteValue, &sc))
+
+	for i, runData := range test.RunInstanceData {
+		runData.ControllerPostState = sc[i]
+
+		r, err := sc[i].GetRoot()
+		require.NoError(t, err)
+
+		runData.ControllerPostRoot = hex.EncodeToString(r[:])
+	}
+}
+
+func (test *ControllerSpecTest) GetPostState() (interface{}, error) {
+	contr := test.generateController()
+
+	ret := make([]*qbft.Controller, len(test.RunInstanceData))
+	for i, runData := range test.RunInstanceData {
+		height := qbft.Height(i)
+		if runData.Height != nil {
+			height = *runData.Height
+		}
+		err := contr.StartNewInstance(height, runData.InputValue)
+		if err != nil && len(test.ExpectedError) == 0 {
+			return nil, err
+		}
+
+		for _, msg := range runData.InputMessages {
+			_, err := contr.ProcessMsg(msg)
+			if err != nil && len(test.ExpectedError) == 0 {
+				return nil, err
+			}
+		}
+
+		// copy controller
+		byts, err := contr.Encode()
+		if err != nil {
+			return nil, err
+		}
+		copied := &qbft.Controller{}
+		if err := copied.Decode(byts); err != nil {
+			return nil, err
+		}
+		ret[i] = copied
+	}
+	return ret, nil
 }

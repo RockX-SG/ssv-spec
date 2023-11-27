@@ -30,5 +30,5 @@ func haveSameRoot(existingMessage, newMessage *dkg.SignedMessage) bool {
 	if err != nil {
 		return false
 	}
-	return bytes.Equal(r1, r2)
+	return bytes.Equal(r1[:], r2[:])
 }

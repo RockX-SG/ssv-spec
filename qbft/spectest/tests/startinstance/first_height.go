@@ -7,7 +7,7 @@ import (
 )
 
 // FirstHeight tests a starting the first instance
-func FirstHeight() *tests.ControllerSpecTest {
+func FirstHeight() tests.SpecTest {
 	return &tests.ControllerSpecTest{
 		Name: "start instance first height",
 		RunInstanceData: []*tests.RunInstanceData{
@@ -16,7 +16,7 @@ func FirstHeight() *tests.ControllerSpecTest {
 				ExpectedDecidedState: tests.DecidedState{
 					DecidedVal: nil,
 				},
-				ControllerPostRoot: "7b74be21fcdae2e7ed495882d1a499642c15a7f732f210ee84fb40cc97d1ce96",
+				ControllerPostRoot: "47713c38fe74ce55959980781287886c603c2117a14dc8abce24dcb9be0093af",
 				ExpectedTimerState: &testingutils.TimerState{
 					Timeouts: 1,
 					Round:    qbft.FirstRound,
